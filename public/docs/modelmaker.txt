@@ -1,0 +1,5314 @@
+Universal Parametric Asset Engine
+North Star
+
+Any asset = Base Template + Deform Pipeline + Feature Graph + Validation Loop + Runtime Outputs.
+Everything is editable, fit-able to orthographic references, and exportable to game-ready LOD/colliders/hardpoints.
+
+1) Canonical Spaces and Determinism
+
+This is the foundation. Without it, everything drifts.
+
+1.1 Coordinate frames
+
+Asset frame: canonical axes (e.g., X=length, Y=up, Z=right), origin at meaningful datum (midship at waterline; car at ground mid-wheelbase).
+
+Panel/region frames: local chart (u,v) per surface region (hood, fender, deck, cockpit rim).
+
+Anchor frames: {pos, normal, tangent, bitangent} for attachments and feature placement.
+
+1.2 Deterministic pipeline rule
+
+Same inputs → identical geometry.
+
+Every operation is ordered, and re-runnable from clean base.
+
+2) Base Templates
+
+Templates are “editable defaults” with stable topology.
+
+2.1 Template types
+
+Surface-grid template (subdivided box/loft shell): best for hulls, car bodies, fairings
+(your Laser hull does this today: BoxGeometry(...segments...) then sculpt vertices). 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+Lathe/loft templates: masts, pipes, fuselages
+
+Panel templates: door/hood/roof as separate charts for clean seams
+
+2.2 Template metadata
+
+Region tags (e.g., hull_side, rail, deck, cockpit)
+
+Seam curves (deck edge, chine, wheel arch)
+
+Default anchors (tow points, mast base, rudder pivot, etc.)
+(your monolith already has hardpoint concepts + positions). 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+3) Deform Pipeline (the “SDF-like power” without SDF)
+
+You don’t need SDF; you need composable deforms.
+
+3.1 Pass ordering (critical)
+
+Global form: length/beam/height scaling, taper envelopes
+
+Primary curves: rocker / sheer / beam distribution
+
+Section shaping: V-depth, bilge radius, rail rounding
+
+Cutouts/recesses: cockpit, vents, wheel wells
+
+Edge language: creases, lips, chamfers (geometry or shading)
+
+Finish: micro bevel, normals, decals
+
+Keep it consistent across all assets so features don’t fight.
+
+3.2 Deform primitives (universal)
+
+NormalOffset(mask, amplitudeProfile)
+
+VectorWarp(mask, vectorField)
+
+CurveDistanceOffset(curve, falloff, profile)
+
+Recess(mask, depth, rimRadius)
+
+Pinch/Crease(curve, sharpness, width)
+
+FilletApprox(edgeMask, radius) (geometry or normal-based)
+
+4) Feature Graph (add new “variables” forever)
+
+A feature is a node that injects params + handles + a local operation.
+
+4.1 Feature node contract
+
+Target: region/chart
+
+Placement: anchor or (u,v) in region chart
+
+Mask field: m(p) ∈ [0,1]
+
+Operation: deform/cut/crease
+
+Params: typed (float/int/bool/curve)
+
+Handles: SVG + gizmos
+
+Examples:
+
+Fender flare, hood scoop, antenna boss, mirror backside curvature, cockpit rim lip, centerboard trunk step.
+
+5) Ortho Reference Pack and Fitting Loop
+
+This is your “LLM can actually help” accelerator.
+
+5.1 ReferencePack format
+
+Views: top, side, front, rear (optionally sections)
+
+For each view:
+
+pxPerMeter (from 1m bar)
+
+centerline definition
+
+bow/stern (or left/right) anchors
+
+optional keypoints (axles, mast step, transom corners)
+
+5.2 Fit targets (keep it minimal)
+
+Extract only:
+
+B(x) half-beam from top silhouette
+
+K(x) keel/rocker from side silhouette
+
+D(x) deck/sheer from side silhouette
+
+1–3 section style cues from front/rear (V vs round, rail thickness feel)
+
+5.3 Error metrics (what “better” means)
+
+Silhouette distance (meters, not pixels)
+
+Keypoint errors (bow tip, max beam position, transom plane)
+
+Fairness penalty (discourage wiggly curves)
+
+Symmetry penalty
+
+5.4 LLM-safe action space
+
+LLM is allowed to output only:
+
+spline control point edits for B(x),K(x),D(x)
+
+feature params within bounds
+
+“enable/disable feature node”
+Nothing else.
+
+6) SVG Diagram Editor (your secret weapon)
+
+This is the user-facing control surface.
+
+6.1 Three canonical editors
+
+Top: edits B(x) + plan cutout curves
+
+Side: edits K(x), D(x) + rocker/shear knees
+
+Section-at-u: edits V/bilge/rail profile
+
+6.2 Overlay feedback
+
+Ghost reference silhouette
+
+Current silhouette
+
+Heatmap of error
+
+Curvature/fairness indicator
+
+This replaces “100 sliders” with “a few splines + a few semantic handles.”
+
+7) Runtime Outputs (game-ready every time)
+
+Every asset build should output:
+
+7.1 Render meshes
+
+LOD0/1/2 (different segment counts)
+(you already track hull vertex cost + lowering segments for perf). 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+Optional normal baking (if you go that route later)
+
+7.2 Collision + physics proxies
+
+Simple collider set (capsules/boxes) or decimated mesh
+
+Optional “field proxy” set for coupling (spheres are great)
+
+Your boat already uses union-of-spheres for hull-water coupling and buoyancy sampling constraints. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+7.3 Hardpoints + metadata
+
+attachment points for rigging, hinges, aero mounts, etc.
+(your current system already formalizes hardpoints). 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+8) System Map
+[ReferencePack Images] ---> [Calibrate + Extract Curves] ---> [Targets B,K,D + Sections]
+                                     |                                   |
+                                     v                                   v
+[SVG Diagram Editors] -----> [Param Graph + Feature Nodes] -----> [Compile Pipeline]
+                                     |                                   |
+                                     v                                   v
+                               [Build Base Mesh] ---> [Apply Deforms] ---> [Outputs]
+                                                             |
+                                                             v
+                                            [Ortho Render + Error Metrics]
+                                                             |
+                                                             v
+                                           [Human + LLM propose bounded edits]
+
+What we should focus on next in chat
+
+If you want “absolute limit” logic, the highest leverage sequence is:
+
+ReferencePack spec + Three.js ortho overlay alignment (so fitting becomes real)
+
+Curve-first hull generator (beam/rocker/sheer as primary drivers; everything else derived)
+
+Feature node contract + 5 core feature types (patch, recess, crease, warp, boss/hole)
+
+Metrics + fairness constraints (so edits converge instead of oscillate)
+
+Export bundle (LOD + collision + hardpoints + versioned param graph)
+
+If you paste your current buildLaserHullGeometry() (or the core deform steps), I’ll rewrite it into the “curve-first + pipeline passes” form without changing your existing capability, just making it universal and fit-ready.
+
+yes proceed all suggestions 1 by1  in sequence per new chat and use absolute limits of chat if possible.
+Thought for 20s
+
+Perfect. We’ll do this one step per message, in the exact sequence.
+Step 1 now: ReferencePack spec + Three.js ortho overlay alignment, built as a universal subsystem you can reuse for any object (boats, cars, helicopters, buildings).
+
+Step 1 — ReferencePack + Ortho Overlay System
+1) Goal and invariants
+
+You want the reference images to behave like CAD underlays:
+
+1 unit = 1 meter (world space)
+
+orthographic cameras (no perspective)
+
+each view image is placed on a plane whose size in meters is correct using the 1m scale bar
+
+each view is aligned by centerline + two anchor points (e.g., bow tip + transom, or front bumper + rear bumper)
+
+the system is deterministic and saved as data (so you can reopen and continue tuning later)
+
+Once this is done, everything else (curve extraction, silhouette error, auto-fitting) becomes straightforward.
+
+2) Universal data format: ReferencePack
+
+Store everything needed to align without guessing.
+
+File layout
+reference_packs/
+  laser_01/
+    top.png
+    side.png
+    front.png
+    rear.png
+    pack.json
+
+pack.json schema (minimal but complete)
+{
+  "id": "laser_01",
+  "units": "meter",
+  "notes": "Nano Banana ortho set, trust scale bars not text labels.",
+  "views": {
+    "top":   { "image": "top.png",   "axis": "TOP",   "cal": { "pxPerMeter": 512, "originPx": [1024, 768], "centerlinePx": [[100,768],[1948,768]], "anchorA_Px": [1900,770], "anchorB_Px": [120,770] }, "crop": null, "opacity": 0.55 },
+    "side":  { "image": "side.png",  "axis": "SIDE",  "cal": { "pxPerMeter": 498, "originPx": [980, 650],  "centerlinePx": [[90,650],[1960,650]],  "anchorA_Px": [1920,640], "anchorB_Px": [110,640] }, "crop": null, "opacity": 0.55 },
+    "front": { "image": "front.png", "axis": "FRONT", "cal": { "pxPerMeter": 520, "originPx": [1024, 700], "centerlinePx": [[1024,50],[1024,1350]], "anchorA_Px": [1024,120], "anchorB_Px": [1024,1320] }, "crop": null, "opacity": 0.55 },
+    "rear":  { "image": "rear.png",  "axis": "REAR",  "cal": { "pxPerMeter": 520, "originPx": [1024, 700], "centerlinePx": [[1024,50],[1024,1350]], "anchorA_Px": [1024,120], "anchorB_Px": [1024,1320] }, "crop": null, "opacity": 0.55 }
+  }
+}
+
+Meaning (no ambiguity)
+
+pxPerMeter: measured from the 1m bar in that view
+
+originPx: pixel that maps to world origin in that view (usually center of hull at some datum)
+
+centerlinePx: two pixel points defining the centerline direction (to compute rotation)
+
+anchorA_Px, anchorB_Px: two pixels on the centerline that define longitudinal positioning (bow/stern, front/rear)
+
+opacity: how strong the underlay is in the viewport
+
+We never trust AI-printed dimensions. Only pxPerMeter from the bar + your anchors.
+
+3) View conventions (universal)
+
+You must standardize how each “view plane” maps into world meters.
+
+Assume your asset frame is:
+
+X = forward
+
+Y = up
+
+Z = right
+
+Then each view has a fixed mapping:
+
+TOP view plane
+
+image +X points to world +X
+
+image +Y points to world -Z (because image y increases downward)
+
+plane sits at some constant Y (above object)
+
+SIDE view plane (port/starboard)
+
+image +X → world +X
+
+image +Y → world -Y
+
+plane sits at some constant Z (beside object)
+
+FRONT view plane
+
+image +X → world +Z
+
+image +Y → world -Y
+
+plane sits at some constant X (in front of object)
+
+REAR view plane
+
+image +X → world -Z (mirrored to face camera cleanly)
+
+image +Y → world -Y
+
+plane sits at some constant X (behind object)
+
+This mapping is the backbone. Everything else is just scale + translation + rotation.
+
+4) Calibration: turn pixels into meters
+
+Given an image of size (Wpx, Hpx) and pxPerMeter:
+
+metersPerPx = 1 / pxPerMeter
+
+plane size in meters:
+
+Wm = Wpx * metersPerPx
+
+Hm = Hpx * metersPerPx
+
+Pixel-to-plane coordinates (meters) with origin at originPx = (ox, oy):
+
+u = (px - ox) * metersPerPx
+
+v = (py - oy) * metersPerPx
+
+(Here v is “down is positive” in image coordinates; we’ll flip when mapping to world.)
+
+5) Alignment: rotation from the centerline
+
+From centerlinePx = [p0, p1]:
+
+dirPx = normalize(p1 - p0)
+
+compute its angle in image space: θ = atan2(dirPx.y, dirPx.x)
+
+For TOP and SIDE views, the desired direction is “perfect horizontal” along +X, so you rotate the plane (or equivalently rotate the texture UV transform) by -θ.
+
+Then you translate so that:
+
+anchorA_Px maps to your chosen world anchor (e.g., bow tip at x = +L/2)
+
+anchorB_Px maps to the stern plane (x = -L/2)
+
+If you don’t know world L yet, you can simply align anchors to your current model bow/stern points (interactive), and later the fit system will tune L.
+
+6) Three.js implementation pattern (works in vanilla Three or R3F)
+A) A “ReferencePlane” object per view
+
+Each is:
+
+a plane mesh with the image texture
+
+a fixed orthographic camera matched to that view
+
+user controls: opacity, show/hide, nudge, lock
+
+B) The plane placement
+
+You can place each plane at a constant offset so it never intersects geometry:
+
+TOP plane at Y = +Ymax + margin
+
+SIDE plane at Z = -(Zmax + margin) (or +)
+
+FRONT plane at X = +Xmax + margin
+
+REAR plane at X = -(Xmax + margin)
+
+The plane should always face the camera.
+
+7) Concrete code skeleton (vanilla Three.js math)
+
+This is the core transform logic you’ll reuse everywhere.
+
+type Px = [number, number];
+type ViewAxis = "TOP" | "SIDE" | "FRONT" | "REAR";
+
+interface ViewCal {
+  pxPerMeter: number;
+  originPx: Px;
+  centerlinePx: [Px, Px];
+  anchorA_Px: Px;
+  anchorB_Px: Px;
+}
+
+interface ViewDef {
+  imageUrl: string;
+  axis: ViewAxis;
+  cal: ViewCal;
+  opacity: number;
+}
+
+function pxToMeters(px: Px, cal: ViewCal): { u: number; v: number } {
+  const mpp = 1 / cal.pxPerMeter;
+  const u = (px[0] - cal.originPx[0]) * mpp;
+  const v = (px[1] - cal.originPx[1]) * mpp;
+  return { u, v };
+}
+
+function centerlineAngle(cal: ViewCal): number {
+  const [a, b] = cal.centerlinePx;
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  return Math.atan2(dy, dx); // image-space angle
+}
+
+/**
+ * Returns a local-plane transform that:
+ * 1) scales plane to meters
+ * 2) rotates to make centerline horizontal
+ * 3) positions so that originPx is at world origin (you can add extra offsets per view)
+ */
+function buildReferencePlaneTransform(view: ViewDef) {
+  const theta = centerlineAngle(view.cal);
+
+  // rotate by -theta so centerline becomes horizontal
+  const rotZ = -theta;
+
+  // originPx maps to local plane origin by construction, so translation is zero here.
+  // We'll set final world translation by placing the plane at a fixed offset (per view).
+  return { rotZ };
+}
+
+
+This is intentionally minimal. The final world orientation depends on axis mapping (next section).
+
+8) Axis mapping: plane local (u,v) → world
+
+After you’ve built a plane where:
+
+local +u is “right”
+
+local +v is “down” (image convention)
+
+You map into world per view:
+
+TOP
+
+worldX = +u
+
+worldZ = -v
+
+worldY = constant
+
+SIDE
+
+worldX = +u
+
+worldY = -v
+
+worldZ = constant
+
+FRONT
+
+worldZ = +u
+
+worldY = -v
+
+worldX = constant
+
+REAR
+
+worldZ = -u (mirror)
+
+worldY = -v
+
+worldX = constant
+
+This mapping is what makes the same pack schema work for boats and cars.
+
+9) Calibration UI: the only “manual” part you need
+
+Don’t over-engineer detection. Make it a tight tool:
+
+For each view image, you click:
+
+scale bar endpoints (1m)
+
+centerline endpoints
+
+anchorA and anchorB on the centerline (front/back)
+
+origin (optional; default = centerline midpoint at mid-length)
+
+Then compute and store pack.json.
+
+This gives you perfect reproducibility.
+
+10) Ortho camera setup (so your renders match underlays)
+
+Each view camera must be orthographic and match the plane’s meters.
+
+Use one rule:
+
+set camera frustum so that the visible width/height in world meters matches your plane coverage.
+
+Example: if TOP plane is Wm x Hm, set:
+
+left = -Wm/2, right = +Wm/2
+
+top = +Hm/2, bottom = -Hm/2
+
+Then position the camera above, looking down:
+
+TOP: camera at (0, +d, 0) looking at origin
+
+SIDE: camera at (0, 0, +d) looking at origin
+
+FRONT: camera at (+d, 0, 0) looking at origin
+
+REAR: camera at (-d, 0, 0) looking at origin
+
+Now your model render and underlay are in the same metric space.
+
+11) What you get immediately after Step 1 is built
+
+You can load any AI-generated ortho plan set.
+
+You can align it in meters and lock it.
+
+You can render your procedural model in matching ortho cameras.
+
+You can visually tune splines/params with confidence that “1cm on image = 1cm in model.”
+
+This is the hinge that makes the universal system real.
+
+Step 2 next (in the next message)
+
+Curve-first generator: restructure your asset builder so the primary drivers are three curves:
+
+B(x) (half-beam / width distribution)
+
+K(x) (keel/rocker or underside profile)
+
+D(x) (deck/shear/roofline)
+
+…and everything else becomes derived modifiers + feature nodes.
+
+
+
+Step 2 — Curve-First Generator (the universal “base form” engine)
+
+The goal of Step 2 is simple and absolute:
+
+Every “main shape” asset (hull, car body, fuselage, fairing) is driven primarily by 3 longitudinal curves — and everything else is derived or layered as features later.
+
+Those three curves are:
+
+B(u) = half-beam / half-width distribution along length
+
+K(u) = keel / underside profile (rocker for boats, floor line for cars, belly line for aircraft)
+
+D(u) = deck / topside profile (sheer line, roofline, upper silhouette)
+
+Where u ∈ [0,1] is normalized length.
+
+Once you have this, you can fit to ortho packs, keep the whole thing editable forever, and scale to any object class.
+
+2.1 Canonical parameterization
+Asset axis conventions
+
+World X = forward (length)
+
+World Y = up (height)
+
+World Z = right (beam)
+
+Normalized coordinate
+
+u = 0 stern, u = 1 bow (or vice versa — choose once and never change)
+
+Convert to meters:
+
+x(u) = (u - u0) * L
+Typically u0 = 0.5 so x ∈ [-L/2, +L/2]
+
+Cross-section coordinate
+
+For a given u, we define a normalized lateral coordinate:
+
+actual half-beam: b = B(u) (meters)
+
+lateral position: z ∈ [-b, +b]
+
+normalized lateral magnitude: s = clamp(|z| / max(b, ε), 0, 1)
+
+So s=0 is centerline (keel), s=1 is rail / max beam.
+
+2.2 The core idea: a Section Law F(s; params)
+
+The hull surface is basically:
+
+bottom baseline: yK = K(u)
+
+top baseline: yD = D(u)
+
+section fraction: t = F(s; SectionParams(u)) where t ∈ [0,1]
+
+Then your surface height is:
+
+𝑦
+(
+𝑢
+,
+𝑧
+)
+=
+𝑦
+𝐾
+(
+𝑢
+)
++
+(
+𝑦
+𝐷
+(
+𝑢
+)
+−
+𝑦
+𝐾
+(
+𝑢
+)
+)
+⋅
+𝑡
+y(u,z)=yK(u)+(yD(u)−yK(u))⋅t
+
+So the entire problem becomes designing F(s) so it can represent:
+
+deep V hulls vs shallow
+
+round bilges vs hard chines
+
+flare / tumblehome
+
+rail rounding
+
+deck lip overhang/sharpness (handled as separate deck surface or as a local top blend)
+
+This is the universal base form.
+
+2.3 SectionParams: the minimum set that can become “100 adjustments”
+
+Instead of 100 random sliders, you store a small bundle that can vary along u (curves again if needed):
+
+Recommended SectionParams(u)
+
+vDepth(u) : how “V” the bottom is (0 flat → 1 deep V)
+
+deadrise(u) : V angle / how steep the bottom planes are
+
+bilgeRadius(u) : roundness where bottom meets sides
+
+chineSharpness(u) : 0 = fully round, 1 = hard edge feel
+
+flare(u) : sides lean out (flare) vs lean in (tumblehome)
+
+railRadius(u) : rounding at the rail
+
+deckCrown(u) : crown height across deck (optional in base)
+
+beamTaperPow(u) : controls how quickly beam shrinks near bow/stern (often derived from B shape, but nice as a modifier)
+
+You do not expose these as 100 knobs. You expose them as:
+
+either curves along u (if needed)
+
+or a few station controls (bow/mid/stern) that interpolate
+
+2.4 A practical F(s) family that is powerful and stable
+
+You want F(s) to be:
+
+monotonic increasing
+
+smooth (C1 ideally)
+
+controllable
+
+composable (round → chine → rail)
+
+Use a layered construction:
+
+2.4.1 Base rise curve (round body)
+
+A clean starting point:
+
+𝑡
+0
+(
+𝑠
+)
+=
+𝑠
+𝑝
+t
+0
+	​
+
+(s)=s
+p
+
+p < 1 = rises quickly (fatter mid)
+
+p > 1 = stays low then rises (sharper sides)
+
+Let p = lerp(0.7, 2.5, bodyPow).
+
+2.4.2 Add V-hull behavior near centerline
+
+A V hull means the surface should rise more steeply near s=0, then soften.
+
+Define a V component:
+
+𝑡
+𝑉
+(
+𝑠
+)
+=
+1
+−
+(
+1
+−
+𝑠
+)
+𝑞
+t
+V
+	​
+
+(s)=1−(1−s)
+q
+
+This is the complement shape (steeper early).
+
+Blend it:
+
+𝑡
+1
+(
+𝑠
+)
+=
+𝑙
+𝑒
+𝑟
+𝑝
+(
+𝑡
+0
+(
+𝑠
+)
+,
+𝑡
+𝑉
+(
+𝑠
+)
+,
+𝑣
+𝐷
+𝑒
+𝑝
+𝑡
+ℎ
+)
+t
+1
+	​
+
+(s)=lerp(t
+0
+	​
+
+(s),t
+V
+	​
+
+(s),vDepth)
+
+q controlled by deadrise (higher q = sharper V).
+
+2.4.3 Bilge/chine shaping via “knee” blending
+
+To represent chines, you need a knee where curvature concentrates.
+
+Pick a knee location k ∈ (0,1) and sharpness h.
+
+A robust knee function:
+
+remap s into two regions:
+
+s0 = clamp(s / k, 0, 1)
+
+s1 = clamp((s - k)/(1 - k), 0, 1)
+
+Define two profiles:
+
+bottom profile tb = s0^{pb}
+
+side profile ts = 1 - (1 - s1)^{ps}
+
+Then combine:
+
+𝑡
+knee
+(
+𝑠
+)
+=
+{
+𝛼
+⋅
+𝑡
+𝑏
+	
+𝑠
+≤
+𝑘
+
+
+𝛼
++
+(
+1
+−
+𝛼
+)
+⋅
+𝑡
+𝑠
+	
+𝑠
+>
+𝑘
+t
+knee
+	​
+
+(s)={
+α⋅tb
+α+(1−α)⋅ts
+	​
+
+s≤k
+s>k
+	​
+
+
+Where α is the height fraction at the knee (a parameter, or derived).
+
+Now blend this into t1 with chineSharpness.
+
+2.4.4 Rail rounding
+
+Near s=1, soften the last bit:
+
+Use a smoothstep window near the rail:
+
+w = smoothstep(1 - rW, 1, s) where rW is rail width fraction
+
+then ease the approach to 1:
+
+t = 1 - (1 - t)^{railEase} inside that window
+
+This prevents ugly pinching at the rail when you fit beam.
+
+2.5 Top view curve B(u) is king
+
+For boats and cars, most “identity” is in planform.
+
+B(u) should be a spline you can fit to top ortho silhouette.
+
+Strong recommendation
+
+Represent B(u) as a piecewise cubic Bézier spline with:
+
+endpoints locked at bow/stern beam values
+
+2–4 interior control points
+
+optional constraints:
+
+B(u) ≥ 0
+
+smooth derivative
+
+fairness penalty (second derivative energy)
+
+Same for K(u) and D(u).
+
+This makes fitting stable and keeps edits intuitive.
+
+2.6 Mesh synthesis: build a parametric surface grid
+
+Stop thinking “deform a box” as the concept.
+Under the hood, do this:
+
+2.6.1 Build a half-surface chart
+
+Indices:
+
+i = 0..Nu along u
+
+j = 0..Nv across s (0..1)
+
+For each (i,j):
+
+u = i/Nu
+
+s = j/Nv
+
+b = B(u)
+
+choose actual z:
+
+z = s * b (half hull, z ≥ 0)
+
+Compute:
+
+y = yK + (yD - yK) * F(s)
+
+x = x(u)
+
+So the half surface point is:
+
+P = (x, y, z)
+
+Then mirror to get the other half:
+
+P' = (x, y, -z)
+
+2.6.2 Store “design coordinates” as attributes
+
+Every vertex should carry:
+
+u (0..1)
+
+s (0..1)
+
+region id (hull side vs deck, later)
+
+optional: “station” index
+
+This is what enables feature masks later.
+
+2.7 Deck surface: don’t force it into hull sides
+
+For anything with a lip/overhang (Laser deck edge, car fender top), you’ll want separate charts:
+
+Hull side chart: from keel to rail (s: 0→1)
+
+Deck chart: from centerline to rail (sd: 0→1) but with its own crown and lip logic
+
+Deck chart formula (simple and powerful)
+
+Let z = sd * Bdeck(u) where Bdeck can be slightly smaller or slightly larger depending on overhang.
+
+Deck height:
+
+𝑦
+deck
+(
+𝑢
+,
+𝑠
+𝑑
+)
+=
+𝐷
+(
+𝑢
+)
++
+𝑐
+𝑟
+𝑜
+𝑤
+𝑛
+(
+𝑢
+)
+⋅
+𝐶
+(
+𝑠
+𝑑
+)
+y
+deck
+	​
+
+(u,sd)=D(u)+crown(u)⋅C(sd)
+
+Where C(sd) is a crown shape like:
+
+C(sd)= (1 - sd^p) or a cosine
+
+Then the deck meets the rail through a controlled blend / seam line.
+This is where Laser’s “rounded edge then sharper lip underhang” lives — but that’s Step 3/feature stage. In Step 2 we just produce clean deck + rail seam.
+
+2.8 Secondary modifiers (allowed, but always as envelopes)
+
+You will need bow/stern specific behavior. Do it as envelopes that modulate curves, not ad-hoc vertex hacks.
+
+Examples:
+
+bow tip length / pointiness: modifies B(u) near u→1
+
+stern transom cutoff: modifies B(u) near u→0 and may clamp to a transom width
+
+bow lift amp: adds to K(u) near bow with a smooth envelope
+
+stern deck drop: adds to D(u) near stern
+
+Envelope template:
+
+𝐸
+(
+𝑢
+;
+𝑢
+0
+,
+𝑤
+,
+𝑛
+)
+=
+𝑠
+𝑚
+𝑜
+𝑜
+𝑡
+ℎ
+𝑠
+𝑡
+𝑒
+𝑝
+(
+𝑢
+0
+−
+𝑤
+,
+𝑢
+0
+,
+𝑢
+)
+𝑛
+⋅
+(
+1
+−
+𝑠
+𝑚
+𝑜
+𝑜
+𝑡
+ℎ
+𝑠
+𝑡
+𝑒
+𝑝
+(
+𝑢
+0
+,
+𝑢
+0
++
+𝑤
+,
+𝑢
+)
+)
+𝑛
+E(u;u
+0
+	​
+
+,w,n)=smoothstep(u
+0
+	​
+
+−w,u
+0
+	​
+
+,u)
+n
+⋅(1−smoothstep(u
+0
+	​
+
+,u
+0
+	​
+
++w,u))
+n
+
+Or simpler: smoothstep ramps.
+
+Rule: every localized effect must be envelope-bounded so it can’t pollute the whole hull.
+
+2.9 Curve fairness (the “absolute limit” quality lever)
+
+If you allow curve control points to move freely, you’ll get wiggly hulls.
+
+So define a fairness term for each curve:
+
+sample the curve at N points
+
+compute discrete second derivative energy:
+
+𝐸
+=
+∑
+𝑖
+(
+𝑐
+𝑖
++
+1
+−
+2
+𝑐
+𝑖
++
+𝑐
+𝑖
+−
+1
+)
+2
+E=
+i
+∑
+	​
+
+(c
+i+1
+	​
+
+−2c
+i
+	​
+
++c
+i−1
+	​
+
+)
+2
+
+When auto-fitting or when user drags handles, you can:
+
+show a fairness meter
+
+optionally auto-relax neighboring points to keep it smooth
+
+This one piece is what separates “parametric toy” from “professional surface.”
+
+2.10 Minimal TypeScript skeleton (core interfaces)
+export interface Curve1D {
+  eval(u: number): number;        // value
+  deriv?(u: number): number;      // optional slope
+}
+
+export interface SectionParams {
+  vDepth: number;        // 0..1
+  deadrise: number;      // 0..1
+  bilgeRadius: number;   // 0..1 (normalized feel)
+  chineSharpness: number;// 0..1
+  flare: number;         // -1..+1 (tumblehome..flare)
+  railRadius: number;    // 0..1
+  bodyPow: number;       // 0..1
+}
+
+export interface SectionLaw {
+  F(s: number, p: SectionParams): number; // returns t 0..1
+}
+
+export interface BaseFormSpec {
+  L: number;             // meters
+  B: Curve1D;            // half-beam curve
+  K: Curve1D;            // keel/underside
+  D: Curve1D;            // deck/roofline
+  sectionAt(u: number): SectionParams;
+
+  Nu: number;
+  Nv: number;
+}
+
+export interface VertexDesignAttrib {
+  u: number;   // 0..1
+  s: number;   // 0..1
+  side: 1 | -1;
+}
+
+2.11 The generator algorithm (universal)
+
+High-level:
+
+sample u stations
+
+for each station, compute b, yK, yD, sectionParams
+
+for each lateral sample, compute s, then t = F(s)
+
+compute vertex position
+
+mirror for other side
+
+build indices
+
+compute normals
+
+That’s it. Everything else is features and refinements.
+
+2.12 Deliverable of Step 2
+
+When Step 2 is implemented, you will have:
+
+a single universal base mesh generator that can output:
+
+Laser hull envelope
+
+car body envelope
+
+helicopter fuselage envelope
+
+any “smooth shell” object
+
+driven by:
+
+three fit-ready splines B,K,D
+
+plus a section style bundle that can vary along length
+
+with:
+
+stable topology
+
+saved design coordinates (u,s)
+
+deterministic rebuild
+
+This is the substrate for Step 3 (feature nodes like cockpit cutouts, wheel arches, scoops, lips, trunks, etc.).
+
+
+
+Step 3 — Feature Node System (the universal “add variables forever” engine)
+
+Step 2 gives you a perfect, fit-able base shell.
+Step 3 is how you add everything else—cockpit cutouts, centerboard trunks, fender arches, hood scoops, antenna bosses, mirror curvature tweaks—without corrupting the base.
+
+The target is a feature graph where each feature:
+
+injects its own parameters + handles
+
+targets a region/chart
+
+computes a mask field
+
+applies an operation in a deterministic stage order
+
+can be enabled/disabled, reordered, and versioned
+
+This is the “diagram-style 3D editor” core.
+
+3.1 Feature Graph Model
+3.1.1 Node graph vs pipeline
+
+Internally, you compile the graph into a linear pipeline (ordered passes), because:
+
+deterministic
+
+fast
+
+composable
+
+Graph is for UX (diagram), pipeline is for execution.
+
+3.1.2 Node contract (absolute minimum)
+
+Every feature node must provide:
+
+Target
+
+region name(s) or chart id(s)
+
+Placement
+
+anchor frame OR param-space (u,v) + orientation
+
+Mask
+
+scalar field m(p) ∈ [0,1] over vertices/samples
+
+Operation
+
+displacement / warp / recess / crease / etc.
+
+Params
+
+typed values + ranges + defaults
+
+Stage
+
+when it runs (after base, before finish, etc.)
+
+Handles
+
+how it appears in SVG overlay + gizmos
+
+That’s it.
+
+3.2 The universal “Mask Field” subsystem
+
+This is the secret weapon.
+
+A mask field is just a function:
+
+𝑚
+(
+𝑣
+)
+=
+𝑐
+𝑙
+𝑎
+𝑚
+𝑝
+(
+𝑓
+(
+𝑣
+)
+,
+0
+,
+1
+)
+m(v)=clamp(f(v),0,1)
+
+where v is a vertex with design attributes (u, s, plus chart local coords).
+
+3.2.1 Core mask primitives (you need only these)
+
+All complex masks are combinations of:
+
+Ellipse in (u,s) space
+great for scoops, bosses, local bulges
+
+Box/rounded-rect in (u,s)
+great for cockpit openings, vents
+
+Distance-to-curve in (u,s)
+great for wheel arches, chines, rails, creases
+
+Distance-to-anchor in 3D
+great for local mounts around a point
+
+Boolean ops on masks
+union = max, intersect = min, subtract = clamp(a - b, 0, 1)
+
+Falloff shaping
+m = smoothstep(0,1,m)^γ for controlling edge hardness
+
+3.2.2 Why (u,s) masks are universal
+
+Because (u,s) is stable even when the mesh changes resolution.
+That’s why we stored u and s attributes in Step 2.
+
+So “cockpit starts at u=0.22 ends at u=0.48” survives LOD changes.
+
+3.3 The 5 Core Feature Types
+
+If you implement these five node types cleanly, you can build almost anything.
+
+Feature Type A — PatchDisplace (bulge/scoop/flare)
+
+Operation: push vertices along surface normal (or a preferred direction).
+
+Params:
+
+center (u0,s0)
+
+radiusU, radiusS
+
+height (+/-)
+
+profile (bell, ridge, plateau)
+
+edgeSharpness
+
+Output:
+
+Δp = n * height * profile(r) * m
+
+Uses:
+
+hood scoop bump
+
+fender flare
+
+deck crown enhancement
+
+bow shoulder fattening
+
+Feature Type B — RecessCut (cockpit/vent/well)
+
+Operation: push inward (negative normal) + optional rim shaping.
+
+You do not do triangle booleans unless needed.
+You “carve” using a recess field + rim lift.
+
+Params:
+
+shape mask (rounded rect, curve loop, etc.)
+
+depth
+
+rimWidth
+
+rimHeight
+
+rimRoundness
+
+Output:
+
+interior: Δp = -n * depth * m
+
+rim: add back a lip with a band-pass mask:
+
+rimMask = band(m, inner=0.7, outer=0.95) (example)
+
+Δp += n * rimHeight * rimMask
+
+Uses:
+
+Laser cockpit subtraction
+
+centerboard trunk recess area
+
+car window cut impressions
+
+vent cutouts (visual)
+
+If you need a real hole: you do it as a controlled topology submesh later (Step 6 export/boolean insert), not by fragile booleans on random triangles.
+
+Feature Type C — CreaseLine (chines/panel breaks)
+
+Operation: locally pinch normals / displace around a curve.
+
+Params:
+
+curve C(u) or spline in (u,s) or on surface
+
+width
+
+sharpness
+
+depth (optional)
+
+Implementation:
+
+d = distance_to_curve(vertex)
+
+m = smoothstep(width, 0, d)^sharpness
+
+displace along a directional field (often normal, sometimes tangent/binormal) to create “break”
+
+Uses:
+
+hull chine
+
+Laser deck/hull seam emphasis
+
+car door panel lines (macro)
+
+aircraft fairing edges
+
+This is huge because “edge language” gives identity without topology violence.
+
+Feature Type D — VectorWarp (mirror shaping, twist, local sculpt)
+
+Operation: warp vertices by a vector field, not necessarily normal.
+
+Params:
+
+mask (ellipse/curve distance)
+
+warp direction:
+
+along +X/+Y/+Z
+
+or local tangent/bitangent
+
+or custom “flow field”
+
+amplitude profile
+
+Output:
+
+Δp = field(p) * amplitude * m
+
+Uses:
+
+side mirror backside curve correction
+
+bow tip alignment without altering beam curve globally
+
+subtle asymmetries (if desired)
+
+helicopter canopy shaping
+
+Feature Type E — BossHole (mounts, rivets, antenna bases)
+
+Operation: build a bump (boss) + optional hole depression.
+
+For stability, you do it as:
+
+boss = PatchDisplace with small ellipse + “flat-top” profile
+
+hole = RecessCut with circular mask
+
+optional: add a hardpoint
+
+Params:
+
+location (u,s) or anchor
+
+boss radius/height
+
+hole radius/depth
+
+fillet feel
+
+Uses:
+
+Laser rigging attachments
+
+rudder gudgeon pads
+
+car antenna mount
+
+bolt heads / fasteners (macro-level)
+
+3.4 Feature Staging (critical order)
+
+Your pipeline stages should be fixed and global:
+
+Base Form (Step 2)
+
+Macro Features (cockpit recess, wheel wells, trunk)
+
+Edge Language (creases, seam sharpness, lip shaping)
+
+Micro Features (bosses, small mounts)
+
+Finish (normals, bevel approximations, decal seams)
+
+Why this matters:
+
+if you crease before you cut, your rim gets destroyed
+
+if you add bosses before a macro warp, they drift
+
+So stages are a hard constraint.
+
+3.5 Feature Handles (SVG + 3D gizmo)
+
+This is what makes it “diagram editor.”
+
+For each feature node, define handles:
+
+2D handles in a specific ortho plane:
+
+cockpit rectangle corners
+
+ellipse radii
+
+curve control points
+
+3D handles:
+
+depth slider along normal
+
+rim width slider
+
+rotate feature orientation
+
+Key rule:
+
+editing handles always changes params, never direct vertex edits
+
+That keeps the entire system reversible and refittable.
+
+3.6 Feature serialization (versionable + LLM-editable)
+
+A feature graph must be saved as JSON.
+
+Example: Laser cockpit feature node
+{
+  "id": "cockpit_recess",
+  "type": "RecessCut",
+  "stage": "MACRO",
+  "targetRegions": ["deck"],
+  "placement": { "mode": "UV", "u0": 0.34, "s0": 0.0, "yaw": 0.0 },
+  "shape": { "kind": "roundedRect", "uMin": 0.22, "uMax": 0.48, "sMin": 0.0, "sMax": 0.42, "radius": 0.04 },
+  "params": { "depth": 0.12, "rimWidth": 0.03, "rimHeight": 0.01, "rimRoundness": 0.7 }
+}
+
+
+LLM can safely propose edits like:
+
+depth += 0.01
+
+uMax += 0.02
+
+radius *= 1.1
+
+No geometry hallucination allowed.
+
+3.7 The “Feature Compiler”
+
+At runtime you do:
+
+rebuild base mesh from Step 2 curves
+
+compile feature nodes by stage order into pass list
+
+apply each pass to vertices (using stored u,s,side attributes)
+
+recompute normals (or do staged normal adjustments)
+
+This means:
+
+toggling a feature is instant
+
+changing a feature param is instant
+
+you can rewind history (undo stack is param patches)
+
+3.8 Laser hull mapping (how your boat fits perfectly)
+
+For Laser specifically, you’ll want these feature nodes:
+
+Macro
+
+cockpit recess (RecessCut)
+
+cockpit rim rounding (part of recess rim)
+
+centerboard trunk step (PatchDisplace + CreaseLine)
+
+centerboard slot (either controlled cut insert later or deep recess + separate hole mesh)
+
+Edge language
+
+deck/hull seam emphasis (CreaseLine along rail curve)
+
+rail lip overhang feel (PatchDisplace band near s≈1 + underside shading seam)
+
+Micro
+
+cleat pads / fairleads / pulley mounts (BossHole + hardpoints)
+
+rudder gudgeon pads (BossHole + hardpoints)
+
+drain plug boss (BossHole)
+
+This gives you “editable Laser” in a graph that looks like a diagram.
+
+3.9 Deliverable of Step 3
+
+After implementing Step 3 you will have:
+
+a feature graph system that makes “add variables” infinite
+
+5 feature types that cover almost all needs
+
+stable serialization + deterministic rebuild
+
+handles that can be controlled by SVG overlays
+
+perfect compatibility with Step 1 ortho underlays and Step 2 curve-first base
+
+
+
+Step 4 — Metrics + Fitting Loop (make ortho packs become “geometry unit tests”)
+
+This step turns your system from “editable” into self-correcting.
+
+You will build a loop that can:
+
+render your model in true orthographic views (top/side/front/rear)
+
+extract silhouettes + keypoints from those renders
+
+compare them against the calibrated ReferencePack underlays
+
+compute error curves in meters
+
+propose and apply a bounded parameter patch (human or LLM)
+
+repeat until error converges
+
+Everything that follows (cars, helicopters, buildings) becomes the same pipeline.
+
+4.1 The fitting philosophy (absolute and universal)
+Hard constraints
+
+Ortho cameras are ground truth.
+
+ReferencePack scale bars define meters.
+
+You optimize only within your typed action space:
+
+spline control points for B(u), K(u), D(u)
+
+section-style params (bow/mid/stern stations)
+
+feature node params (local edits)
+
+enable/disable nodes
+
+Trust hierarchy (prevents drift)
+
+Top view dominates width → fit B(u) primarily from TOP
+
+Side view dominates height → fit K(u) and D(u) primarily from SIDE
+
+Front/Rear dominate section style → fit SectionParams(u) primarily from FRONT/REAR
+If conflicts exist, you don’t average blindly—you obey the hierarchy.
+
+4.2 OrthoRenderPack (your model → images in metric space)
+
+You already built Step 1 alignment. Now you need a standardized render output:
+
+For each view V ∈ {top, side, front, rear} render into an offscreen target:
+
+resolution: start at 1024×1024 (plenty; 512 also works)
+
+flat shader:
+
+hull/body = solid white
+
+background = transparent
+
+disable lighting, textures, post-processing
+
+output should contain only silhouette geometry (optionally include separate pass for deck vs hull)
+
+Why: silhouette extraction is easiest from a binary alpha mask.
+
+4.3 Silhouette extraction (fast, robust, works in Three.js)
+4.3.1 Readback
+
+renderer.readRenderTargetPixels(rt, 0, 0, W, H, buffer)
+
+threshold alpha: a > 10 (or similar)
+
+4.3.2 Convert pixels → meters (per view)
+
+Given your ortho camera frustum:
+
+width in meters: Wm = right - left
+
+height in meters: Hm = top - bottom
+
+Then:
+
+metersPerPixelX = Wm / Wpx
+
+metersPerPixelY = Hm / Hpx
+
+And you can map pixel coordinates into world-plane meters directly.
+
+4.3.3 Extract 1D silhouette functions (the key trick)
+
+Don’t store all edge pixels. Store scanline extrema to get clean curves.
+
+TOP view (width distribution):
+For each x_px (or each column), find:
+
+z_left(x) = smallest y_px with solid? (depends orientation)
+
+z_right(x) = largest y_px with solid
+Convert to meters:
+
+halfBeam_model(x) = 0.5 * (z_right - z_left)
+
+SIDE view (rocker + sheer):
+For each x column:
+
+y_bottom(x) = lowest solid pixel
+
+y_top(x) = highest solid pixel
+Convert to meters:
+
+K_model(x) = y_bottom(x)
+
+D_model(x) = y_top(x)
+
+FRONT/REAR (section style):
+For each y row:
+
+z_left(y), z_right(y) → width vs height profile
+This provides section targets (not necessarily full reconstruction).
+
+You now have compact, smooth-ish arrays:
+
+B_model[i]
+
+K_model[i]
+
+D_model[i]
+
+Store them sampled at N stations (e.g., 256).
+
+4.4 Reference silhouette extraction (from ReferencePack)
+
+You do the same scanline extrema extraction on the reference images.
+
+But first:
+
+you must apply the ReferencePack calibration:
+
+pxPerMeter
+
+origin alignment
+
+centerline rotation correction (if any)
+
+Practical: you can precompute and cache:
+
+B_ref(x), K_ref(x), D_ref(x)
+
+plus keypoints
+
+4.5 Error metrics (your objective function)
+
+You want both “global score” and “diagnostic curves.”
+
+4.5.1 Signed error curves (most important)
+
+At each sampled station i along length:
+
+eB[i] = B_model[i] - B_ref[i] (meters)
+
+eK[i] = K_model[i] - K_ref[i]
+
+eD[i] = D_model[i] - D_ref[i]
+
+These three curves tell you exactly where you’re off.
+
+4.5.2 Scalar scores (for convergence and automation)
+
+RMS:
+
+rmsB = sqrt(mean(eB^2))
+
+rmsK, rmsD
+
+Max absolute error:
+
+maxB = max(|eB|) etc.
+
+Area mismatch (optional):
+
+difference in silhouette area in each view
+
+4.5.3 Fairness penalties (prevents “wiggly cheating”)
+
+You must discourage fitting by adding noise.
+
+For each curve error or for your spline itself:
+
+discrete second-derivative energy:
+
+E_fair(B) = Σ (B[i+1] - 2B[i] + B[i-1])^2
+
+Final objective (conceptually):
+
+𝐽
+=
+𝑤
+𝐵
+∥
+𝑒
+𝐵
+∥
+2
++
+𝑤
+𝐾
+∥
+𝑒
+𝐾
+∥
+2
++
+𝑤
+𝐷
+∥
+𝑒
+𝐷
+∥
+2
++
+𝜆
+ 
+𝐸
+fair
+J=w
+B
+	​
+
+∥e
+B
+	​
+
+∥
+2
++w
+K
+	​
+
+∥e
+K
+	​
+
+∥
+2
++w
+D
+	​
+
+∥e
+D
+	​
+
+∥
+2
++λE
+fair
+	​
+
+
+Weights follow trust hierarchy (TOP width is strong, etc.).
+
+4.6 Keypoints (for locking the “identity”)
+
+Silhouette curves alone can drift globally (e.g., whole hull shifts).
+
+So you define a small set of keypoints per view.
+
+Examples:
+
+Boat
+
+bow tip (max X extent in top/side)
+
+transom plane corners (rear view)
+
+max beam station (argmax of B_ref)
+
+cockpit corners (if visible)
+
+mast step (if drawn)
+
+Car
+
+axle centers (critical)
+
+wheel arch peak points
+
+roof highest point
+
+bumper endpoints
+
+Keypoints can be:
+
+auto-detected from extrema
+
+or user-clicked once and saved into ReferencePack
+
+Keypoint errors become extra terms:
+
+eKP = ||p_model - p_ref||
+
+Keypoints stabilize scale/placement while curves handle shape.
+
+4.7 Optimization strategy (stable, fast, and universal)
+
+You do multi-scale fitting:
+
+Stage A — Fit base curves only (big shape)
+
+Variables:
+
+spline control points for B(u), K(u), D(u)
+
+maybe global L if you allow it
+
+Objective:
+
+minimize eB, eK, eD with fairness
+
+Algorithm options:
+
+Least-squares on spline control points (best):
+
+treat curve as spline with small number of controls (8–16)
+
+solve with regularization (fairness)
+
+Coordinate descent (simple fallback):
+
+nudge one control point at a time
+
+keep if improves score
+
+Finite-difference Gauss-Newton (more aggressive):
+
+small dims → feasible
+
+Start with (1). It gives professional smooth results.
+
+Stage B — Fit section style (cross-section cues)
+
+Variables:
+
+SectionParams at a few stations (bow/mid/stern), interpolated
+
+Objective:
+
+match front/rear profiles (width vs height), plus subjective constraints (V vs round)
+
+Stage C — Fit macro features (localized residual)
+
+Enable nodes like cockpit recess / trunk / wheel wells.
+Variables:
+
+feature node params only
+
+Objective:
+
+reduce localized silhouette mismatch (in a mask region)
+
+keep global curves mostly locked
+
+Stage D — Final polish
+
+Small adjustments across all, but bounded.
+
+This is how you avoid “feature fighting” and keep convergence monotonic.
+
+4.8 “Bounded patch” format (human + LLM safe)
+
+Every iteration results in a patch like:
+
+{
+  "patchId": "fit_2026-01-01T14:22:00Z",
+  "changes": [
+    {"path":"curves.B.ctrl[3].y", "op":"add", "value": -0.008},
+    {"path":"curves.K.ctrl[5].y", "op":"add", "value": +0.004},
+    {"path":"features.cockpit_recess.params.depth", "op":"set", "value": 0.118}
+  ],
+  "metricsBefore": {"rmsB":0.012,"rmsK":0.009,"rmsD":0.014},
+  "metricsAfter":  {"rmsB":0.008,"rmsK":0.007,"rmsD":0.012},
+  "notes": [
+    "Top view: max beam slightly too wide midship",
+    "Side view: rocker too flat near bow shoulder"
+  ]
+}
+
+
+Rules:
+
+each path is whitelisted
+
+each change is clamped to parameter bounds
+
+patches are undoable (stack)
+
+This is your “geometry git.”
+
+4.9 UI you should build (minimum, perfect)
+
+You only need 4 panels:
+
+Ortho view grid (top/side/front/rear)
+
+shows: reference underlay + model render + silhouette edges
+
+Error curves for B/K/D (plots in meters)
+
+Selected node editor (only params for selected feature)
+
+Patch timeline (undo/redo + accept/reject)
+
+That’s enough to tune a Laser hull to near blueprint perfection quickly.
+
+
+
+Step 5 — Compiler + Runtime Outputs (LOD, colliders, hardpoints, export bundles) + LLM patch protocol
+
+Step 5 is where this becomes a production engine instead of a modeling experiment.
+
+You will build a single compiler that takes:
+
+BaseCurves (B/K/D splines + section stations)
+
+FeatureGraph (nodes + params + ordering)
+
+ReferencePack (optional, for fit diagnostics)
+
+…and outputs a complete, game-ready AssetBundle:
+
+render meshes (LOD0/1/2…)
+
+collision meshes / primitive colliders
+
+field proxies (spheres/capsules) for water/air/contacts
+
+hardpoints (rigging/hinges/mounts)
+
+metadata + versioned param patch history
+
+optional ortho renders + error reports (for LLM/human tuning)
+
+This is the universal “build artifact.”
+
+5.1 The Compiler (one entry point, deterministic)
+5.1.1 Inputs
+
+spec.json (the parametric definition)
+
+base curves, section params
+
+feature graph
+
+region maps
+
+material slots
+
+build config:
+
+LOD presets
+
+collider preset
+
+proxy preset
+
+export format options
+
+5.1.2 Outputs: AssetBundle/
+AssetBundle/
+  manifest.json
+  meshes/
+    LOD0.glb
+    LOD1.glb
+    LOD2.glb
+  collision/
+    colliders.json
+    collisionMesh.glb   (optional)
+  proxies/
+    buoyancySpheres.json
+    aeroProxies.json
+  hardpoints/
+    hardpoints.json
+  diagnostics/
+    ortho_top.png
+    ortho_side.png
+    ortho_front.png
+    ortho_rear.png
+    error_curves.json
+    fit_report.json
+  history/
+    patches.jsonl
+    spec_snapshot.json
+
+
+Everything versionable. Everything reproducible.
+
+5.2 LOD Generation (do it by design, not decimation)
+
+Decimation is fragile for parametric assets. You already control topology through sampling density, so LOD is “just rebuild with fewer samples.”
+
+5.2.1 LOD presets (universal)
+
+Define LODs by (Nu, Nv) plus feature toggles.
+
+Example:
+
+LOD0: Nu=256, Nv=96 (high)
+
+LOD1: Nu=160, Nv=64
+
+LOD2: Nu=96, Nv=40
+
+LOD3: Nu=64, Nv=24 (optional)
+
+5.2.2 Feature-aware simplification
+
+For lower LODs:
+
+disable micro features (bosses, tiny lips)
+
+keep macro silhouette features (cockpit, wheel arches)
+
+preserve seams/creases (cheap identity)
+
+This is controlled by feature node “importance”:
+
+importance: "macro" | "edge" | "micro"
+
+So the compiler can automatically drop micro features for LOD2+.
+
+5.2.3 “Silhouette protection”
+
+You can optionally enforce:
+
+LOD1/2 must keep top and side silhouette within ε meters of LOD0.
+If not, increase samples or keep a macro feature.
+
+This becomes an internal quality gate.
+
+5.3 Collision Output (three tiers)
+
+Pick based on gameplay needs.
+
+Tier A — Primitive colliders (fastest)
+
+boxes/capsules/spheres aligned to anchor frames
+
+best for vehicles/boats in arcade physics
+
+Tier B — Simplified collision mesh (balanced)
+
+generate a low-resolution hull/shape mesh directly from LOD2
+
+optionally shrink-wrap to avoid jitter
+
+best for stable contact and interior cutouts
+
+Tier C — Hybrid (recommended universal default)
+
+macro collision mesh + primitive supplements
+
+e.g., boat hull mesh + capsule for mast base zone, etc.
+
+Key rule: collision is a separate build target. Never “reuse LOD0” as collision.
+
+5.4 Field Proxies (the cheap “SDF benefits” you actually want)
+
+You don’t need full SDF. You need queryable proxies.
+
+5.4.1 Union-of-spheres proxy set
+
+Represent the volume with spheres:
+
+for buoyancy sampling
+
+for water intersection estimates
+
+for cheap distance-ish checks
+
+Store as:
+
+{
+  "spheres":[
+    {"c":[x,y,z],"r":0.12,"w":1.0},
+    ...
+  ]
+}
+
+
+Generate them deterministically:
+
+sample stations along u
+
+at each station place 1–3 spheres across beam
+
+radius tied to local beam and depth
+
+5.4.2 Capsule chains (good for long structures)
+
+Mast, boom, fuselage: capsules are perfect.
+
+5.4.3 Aero proxies (optional)
+
+For aircraft/helis: store surface patches or spanwise sample points with normals/areas.
+
+5.5 Hardpoints (attachments as first-class data)
+
+Hardpoints are non-negotiable for rigs, vehicles, and simulation.
+
+5.5.1 Hardpoint format
+
+Each hardpoint includes:
+
+name/id
+
+world transform (pos + quaternion)
+
+parent region/chart (optional)
+
+semantic role
+
+constraints (load limits, axis locks, etc.)
+
+Example:
+
+{
+  "hardpoints": [
+    {
+      "id": "rudder_gudgeon_upper",
+      "role": "hinge",
+      "pos": [ -1.98, 0.22, 0.00 ],
+      "rot": [ 0, 0, 0, 1 ],
+      "meta": { "axis": "Y", "limitDeg": 35 }
+    }
+  ]
+}
+
+5.5.2 How hardpoints stay stable
+
+Hardpoints should be defined in design space:
+
+by (u,s) and a local “height fraction”
+or by anchor frames derived from curves/seams.
+
+Then the compiler resolves them into world space for each build.
+
+So when you tune hull shape, hardpoints move correctly.
+
+5.6 Export bundle (glTF/GLB + metadata)
+
+Your engine is Three.js, so glTF is the natural export.
+
+Mesh export requirements
+
+stable vertex order where possible (optional)
+
+normals computed deterministically
+
+tangents optional (needed for normal mapping)
+
+material slots: hull, deck, fittings
+
+Metadata export
+
+manifest.json points to everything
+
+includes build hash:
+
+hash(spec.json + patches + compiler version + build config)
+This gives you perfect reproducibility.
+
+5.7 Diagnostics output (so tuning is scientific)
+
+If ReferencePack is present, compiler outputs:
+
+ortho renders
+
+extracted silhouette arrays
+
+error arrays in meters
+
+final fit score summary
+
+fit_report.json example:
+
+{
+  "rms": { "B": 0.0082, "K": 0.0065, "D": 0.0101 },
+  "max": { "B": 0.021, "K": 0.018, "D": 0.026 },
+  "notes": [
+    "Top: slight width excess at u=0.62–0.70",
+    "Side: deck drop too early near stern"
+  ]
+}
+
+5.8 LLM Patch Protocol (safe, bounded, convergent)
+
+This is how you actually leverage multimodal models without chaos.
+
+5.8.1 Inputs you give the model
+
+ortho renders (top/side/front/rear)
+
+error curve plots OR raw error arrays
+
+current spec snapshot (only the whitelisted parts)
+
+parameter bounds + whitelist schema
+
+5.8.2 Output you accept
+
+Only a Patch in the exact JSON patch schema (Step 4):
+
+changes must be within bounds
+
+limited magnitude per iteration (step size clamp)
+
+compiler runs and must improve score or be rejected
+
+5.8.3 Acceptance rules (automatic gate)
+
+accept if:
+
+rms_total decreases by ≥ δ
+
+fairness penalty does not increase past threshold
+
+no keypoint errors worsen beyond tolerance
+Otherwise reject (or ask for alternate patch).
+
+This makes the LLM an optimizer under supervision, not an author.
+
+5.9 Master System Map (end-to-end)
+[spec.json + featureGraph] ---> (Compiler)
+           |                   |
+           v                   v
+     [Build LOD0 Mesh]    [Build LOD1/2...]
+           |
+           v
+   [Collision Build]   [Proxy Build]   [Hardpoints Resolve]
+           \             |             /
+            \            |            /
+             -----> [AssetBundle Manifest] -----> Export GLB + JSON
+
+Optional fitting:
+[ReferencePack] -> [Ortho Render] -> [Silhouette Extract] -> [Error Metrics]
+                                      |
+                                      v
+                                [Patch Proposal]
+                                      |
+                                      v
+                                [Recompile + Gate]
+
+5.10 What Step 5 “completes”
+
+After this, your system can produce:
+
+a Laser hull that is editable, fit-able, simulation-ready
+
+and the exact same pipeline can output:
+
+a car body with wheel wells, hood scoop, mirrors
+
+a helicopter fuselage with doors, skids, antenna mounts
+
+building shells with windows, trims, balconies
+
+All from a diagram/graph + curves + features.
+
+
+
+
+
+Step 6 — Library, Presets, and Authoring UX (the “universal editor” product layer)
+
+This is the last layer: turning the engine into a repeatable system where you can author “editable default models” quickly, safely, and endlessly—without UI chaos.
+
+Step 6 produces:
+
+Template Library (boats/cars/fuselages/buildings)
+
+Feature Library (cockpits, wheel arches, scoops, seams, bosses…)
+
+Diagram UX (SVG tools that create nodes)
+
+Graph + Patch Timeline (blueprint-like editor)
+
+Preset Packs (ready-to-edit baseline assets)
+
+And it locks the “absolute limit” philosophy: everything is reproducible, fit-able, and patchable.
+
+6.1 The Library Architecture
+6.1.1 Asset = Template + Preset + FeatureGraph
+
+Template: code + topology rules (Step 2 base generator)
+
+Preset: default curve shapes + section stations + materials
+
+FeatureGraph: nodes enabled for this asset class
+
+BuildConfig: LOD/collider/proxy/hardpoint presets
+
+So “Laser hull” is:
+
+Template: BoatHullTemplate
+
+Preset: LaserPreset_v1
+
+FeatureGraph: LaserFeatures_v1
+
+BuildConfig: SailboatConfig_v1
+
+6.1.2 Folder structure (universal)
+src/parametric/
+  templates/
+    BoatHullTemplate.ts
+    CarBodyTemplate.ts
+    FuselageTemplate.ts
+    BuildingShellTemplate.ts
+  features/
+    PatchDisplace.ts
+    RecessCut.ts
+    CreaseLine.ts
+    VectorWarp.ts
+    BossHole.ts
+    library/
+      SailboatCockpit.ts
+      CenterboardTrunk.ts
+      WheelArch.ts
+      HoodScoop.ts
+      PanelGap.ts
+      AntennaMount.ts
+  presets/
+    laser/
+      LaserPreset_v1.json
+      LaserFeatures_v1.json
+      LaserBuildConfig_v1.json
+    defender/
+      DefenderPreset_v1.json
+      DefenderFeatures_v1.json
+      DefenderBuildConfig_v1.json
+  compiler/
+    compileAsset.ts
+    buildLOD.ts
+    buildColliders.ts
+    buildProxies.ts
+    buildHardpoints.ts
+  reference/
+    ReferencePack.ts
+    calibratePack.ts
+    extractSilhouettes.ts
+    computeErrors.ts
+  editor/
+    GraphEditor.tsx
+    OrthoViewGrid.tsx
+    SvgOverlayTools.ts
+    PatchTimeline.tsx
+
+
+This is the product skeleton. Everything plugs into it.
+
+6.2 Template Library (the 4 universal base classes)
+Template A — BoatHullTemplate
+
+curves: B(u), K(u), D(u)
+
+section stations: bow/mid/stern params
+
+regions: hull, deck, rail, transom, cockpitZone
+
+outputs: hull mesh + deck mesh (separate charts)
+
+Template B — CarBodyTemplate
+
+Same engine, different semantics:
+
+B(u) = half-width distribution
+
+K(u) = ground clearance / belly line
+
+D(u) = roofline / upper silhouette
+
+regions: hood, fenders, doors, roof, bumpers
+
+anchor set: axle centers, wheel arch curves, door seams
+
+Template C — FuselageTemplate
+
+lengthwise body with cross-section family
+
+anchors: cabin door, rotor mast, tail boom root
+
+strong use of VectorWarp + CreaseLine
+
+Template D — BuildingShellTemplate
+
+floor stack + façade charts
+
+windows/balconies as feature nodes (recesses + trims)
+
+orthos matter massively (front/side elevations)
+
+All four reuse the same feature node system.
+
+6.3 Feature Library (what you ship as primitives vs “composed features”)
+6.3.1 Primitive features (your “5 core” from Step 3)
+
+PatchDisplace
+
+RecessCut
+
+CreaseLine
+
+VectorWarp
+
+BossHole
+
+These are your “instruction set.”
+
+6.3.2 Composed features (reusable macros)
+
+These are just bundles of primitive nodes with shared handles.
+
+Examples:
+
+SailboatCockpit = RecessCut + Rim + optional seat shelf
+
+CenterboardTrunk = PatchDisplace step + CreaseLine edges + slot insert marker
+
+WheelArch = CurveDistance mask + RecessCut + flare lip
+
+HoodScoop = PatchDisplace + RecessCut inlet + crease rim
+
+PanelGap = CreaseLine pair + dark seam material strip
+
+AntennaMount = BossHole + hardpoint
+
+This is how you move fast: author once, reuse everywhere.
+
+6.4 Diagram Authoring UX (SVG tools → node creation)
+
+This is the heart of your “intuitive secret method.”
+
+6.4.1 SVG tool-to-node mapping (must be exact)
+
+Draw ellipse → creates PatchDisplace (or BossHole depending mode)
+
+Draw rounded rectangle → creates RecessCut
+
+Draw spline → creates CreaseLine or “CurveMask”
+
+Drag station points on curve view → edits B/K/D splines
+
+Paint band near rail → creates “RailLipBand” (a preconfigured PatchDisplace)
+
+Rule: every drawing action creates or edits a node, never raw vertices.
+
+6.4.2 Three SVG overlays (canonical)
+
+Top overlay
+
+edit B(u)
+
+create plan cutouts (cockpit, vents)
+
+create wheel arches (cars)
+
+Side overlay
+
+edit K(u), D(u)
+
+define rocker knees / deck drop knees
+
+Section overlay
+
+edit section style parameters at stations
+
+visualize V/bilge/rail
+
+6.5 Graph Editor + Patch Timeline (blueprint-level control)
+6.5.1 Graph editor minimal features
+
+list nodes by stage: Macro / Edge / Micro
+
+enable/disable
+
+reorder within stage (rarely needed, but vital)
+
+click node → show its handles + params
+
+You don’t need a complicated full blueprint UI on day one; a staged list is enough. Later you can show “wires” visually.
+
+6.5.2 Patch timeline (the “geometry git”)
+
+Every edit creates a patch entry:
+
+param changed
+
+node created/deleted
+
+handles moved
+
+Supports:
+
+undo/redo
+
+branch (optional later)
+
+“accepted fit patch” vs “manual patch”
+
+This is huge for trust and iteration.
+
+6.6 Preset Packs (how you ship “editable default models”)
+
+A preset pack is just:
+
+default curves
+
+default section stations
+
+default feature graph
+
+default build config (LODs/colliders/proxies/hardpoints)
+
+Example: LaserPreset_v1 contents
+
+B(u) control points = Laser planform approximation
+
+K(u) = Laser rocker line
+
+D(u) = deck sheer
+
+features enabled:
+
+cockpit recess
+
+cockpit rim
+
+centerboard trunk step
+
+rudder gudgeon pads + hardpoints
+
+mast step hardpoint
+
+build config:
+
+LOD0/1/2 sampling
+
+buoyancy spheres preset
+
+collision hull mesh preset
+
+Then your orthographic fitting loop refines it.
+
+6.7 The “absolute limit” first implementation target (forces everything to work)
+
+If you want the system to be real, you pick a target that touches all subsystems.
+
+Target: Laser hull + cockpit + trunk + hardpoints + buoyancy proxy + ortho fit
+
+Because it forces:
+
+base curves (B/K/D)
+
+macro feature (cockpit)
+
+edge language (rim)
+
+structural insert (centerboard trunk)
+
+hardpoints (rigging + rudder)
+
+proxies (buoyancy sampling)
+
+reference pack overlay + error curves
+
+If Laser works perfectly, cars and helicopters become “just different presets.”
+
+
+
+
+
+
+
+Deliverable A — Universal Parametric Asset Engine Master Index
+A0. Prime directive
+
+Build a deterministic parametric asset compiler that outputs a complete, game-ready AssetBundle from:
+
+Base Template (curve-first shell generator)
+
+Feature Graph (node-based local edits)
+
+ReferencePack (optional ortho underlay + fitting)
+
+BuildConfig (LOD/colliders/proxies/hardpoints/export)
+
+This must support your current Laser hull workflow (subdivided base + sculpt), then refactor into the universal curve/feature architecture while retaining the same editability you already have (bow/stern taper, V-hull depth, rocker, bow lift, cockpit cut, bow tip, stern deck drop, etc.). 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+ 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+A1. Repository structure (canonical)
+src/
+  parametric/
+    core/
+      types.ts
+      math/
+        curves.ts
+        splines.ts
+        envelopes.ts
+        fairness.ts
+        masks.ts
+        transforms.ts
+      geometry/
+        surfaceGrid.ts
+        normals.ts
+        seams.ts
+        uv.ts
+      pipeline/
+        stages.ts
+        applyPasses.ts
+        compileGraph.ts
+        patch.ts
+        bounds.ts
+        hashing.ts
+    templates/
+      BoatHullTemplate.ts
+      CarBodyTemplate.ts
+      FuselageTemplate.ts
+      BuildingShellTemplate.ts
+    features/
+      primitives/
+        PatchDisplace.ts
+        RecessCut.ts
+        CreaseLine.ts
+        VectorWarp.ts
+        BossHole.ts
+      composed/
+        SailboatCockpit.ts
+        CenterboardTrunk.ts
+        RailLip.ts
+        WheelArch.ts
+        HoodScoop.ts
+        PanelGap.ts
+        AntennaMount.ts
+    reference/
+      ReferencePack.ts
+      calibrate.ts
+      extractSilhouette.ts
+      errors.ts
+      keypoints.ts
+      renderOrtho.ts
+    compiler/
+      compileAsset.ts
+      buildLOD.ts
+      buildColliders.ts
+      buildProxies.ts
+      buildHardpoints.ts
+      exportGLB.ts
+      diagnostics.ts
+  app/
+    editor/
+      OrthoViewGrid.tsx
+      SvgOverlay.tsx
+      GraphEditor.tsx
+      PatchTimeline.tsx
+      ParamInspector.tsx
+      ErrorCurves.tsx
+    demo/
+      LaserDemoScene.tsx
+      AssetBundleViewer.tsx
+
+assets/
+  reference_packs/
+  presets/
+  bundles/
+
+A2. Core data model (schemas that everything obeys)
+A2.1 Design-space attributes (must exist on vertices)
+
+Every generated vertex must carry:
+
+u in [0..1] (longitudinal)
+
+s in [0..1] (lateral magnitude within half-beam)
+
+side in {+1, -1} (port/starboard)
+
+This makes features and masks resolution-independent.
+
+A2.2 Curves
+
+Use spline curves (cubic Bézier or cubic Hermite) with fairness regularization.
+
+export interface Curve1D {
+  eval(u: number): number;
+  // optional for editing/optimization
+  ctrl?: number[]; // control values in canonical form
+}
+
+
+You will have:
+
+B(u) = half-beam (top-view constraint)
+
+K(u) = bottom/keel line (side-view constraint)
+
+D(u) = deck/shear line (side-view constraint)
+
+A2.3 Section law (cross-section family)
+
+Base surface uses:
+
+𝑦
+(
+𝑢
+,
+𝑧
+)
+=
+𝐾
+(
+𝑢
+)
++
+(
+𝐷
+(
+𝑢
+)
+−
+𝐾
+(
+𝑢
+)
+)
+⋅
+𝐹
+(
+𝑠
+;
+𝑃
+(
+𝑢
+)
+)
+y(u,z)=K(u)+(D(u)−K(u))⋅F(s;P(u))
+
+where s = |z| / B(u) and P(u) are section parameters (V, bilge, chine, flare, rail).
+
+A2.4 Feature node contract (primitives)
+export type FeatureStage = "BASE"|"MACRO"|"EDGE"|"MICRO"|"FINISH";
+
+export interface FeatureNode {
+  id: string;
+  type: "PatchDisplace"|"RecessCut"|"CreaseLine"|"VectorWarp"|"BossHole" | string;
+  stage: FeatureStage;
+  enabled: boolean;
+
+  targetRegions: string[];  // e.g. ["deck"], ["hull"], ["rail"]
+  placement: {
+    mode: "UV"|"ANCHOR";
+    u0?: number; s0?: number;
+    anchorId?: string;
+    yaw?: number; pitch?: number; roll?: number;
+  };
+
+  // mask definition (universal)
+  mask: MaskSpec;
+
+  // operation params (typed per node type)
+  params: Record<string, number|boolean|string|number[]|object>;
+
+  // editor UI hints (SVG handles, colors, etc.)
+  ui?: Record<string, any>;
+}
+
+A2.5 MaskSpec (the “universal locality system”)
+
+Must support:
+
+ellipse / roundedRect in (u,s)
+
+curve-distance band
+
+boolean combine
+
+falloff/exponent
+
+export type MaskSpec =
+  | { kind:"ellipse"; u:number; s:number; ru:number; rs:number; pow?:number }
+  | { kind:"roundedRect"; uMin:number; uMax:number; sMin:number; sMax:number; r:number; pow?:number }
+  | { kind:"curveBand"; curveId:string; width:number; sharpness:number }
+  | { kind:"op"; op:"union"|"intersect"|"subtract"; a:MaskSpec; b:MaskSpec; pow?:number };
+
+A2.6 Hardpoints (first-class simulation hooks)
+
+You already have Laser hardpoints for mast base, gooseneck, centerboard trunk, traveler points, mainsheet base, rudder pivot, vang base, boom end, etc. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+
+Keep that concept, but store them in design space and resolve to world every build.
+
+export interface HardpointSpec {
+  id: string;
+  attach: "asset"|"subpart"; // boat, boom, rudder, etc.
+  // design-space definition (stable under shape edits)
+  def:
+    | { mode:"UV"; region:string; u:number; s:number; h:number; normalHint?: "up"|"out"|"forward" }
+    | { mode:"ANCHOR"; anchorId:string; offset:[number,number,number] };
+  meta?: Record<string, any>;
+}
+
+A2.7 ReferencePack (for ortho overlay + fitting)
+
+This persists per-view scale and anchors so underlays are metric-correct and alignable.
+
+export interface ReferencePack {
+  id: string;
+  units: "meter";
+  views: Record<"top"|"side"|"front"|"rear", {
+    image: string;
+    axis: "TOP"|"SIDE"|"FRONT"|"REAR";
+    cal: {
+      pxPerMeter: number;
+      originPx: [number, number];
+      centerlinePx: [[number,number],[number,number]];
+      anchorA_Px: [number,number];
+      anchorB_Px: [number,number];
+    };
+    opacity: number;
+  }>;
+}
+
+A2.8 Patch protocol (the only accepted edit format)
+
+All modifications occur as bounded patches.
+
+export interface ParamPatch {
+  patchId: string;
+  changes: Array<{ path: string; op: "set"|"add"|"mul"; value: any }>;
+  metricsBefore?: any;
+  metricsAfter?: any;
+  notes?: string[];
+}
+
+A3. Execution pipeline (deterministic stages)
+
+Fixed order:
+
+BASE: build base shell from curves + section law
+
+MACRO: recesses / major cut impressions (cockpit, wheel wells)
+
+EDGE: crease language, rail seams, lips
+
+MICRO: bosses, mounts, small pads
+
+FINISH: normals, smoothing groups, optional bevel approximation
+
+This aligns with the sculpt steps you already use (cockpit cutout, bow tip shaping, stern deck drop, etc.) but formalizes them. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+A4. Compiler outputs (AssetBundle)
+
+Must emit:
+
+A4.1 Render meshes
+
+LOD0/LOD1/LOD2 generated by resampling (Nu,Nv) (no decimation)
+
+GLB export per LOD
+
+A4.2 Collision
+
+Primitive collider set (capsules/boxes) OR
+
+Simplified collision mesh built from low LOD
+
+Hybrid recommended
+
+A4.3 Proxies
+
+Union-of-spheres proxy list for hull/water coupling (you already use this pattern) 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+Buoyancy sample points list (cap at 64 like your current system) 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+A4.4 Hardpoints
+
+resolved world transforms for rigging/spars/rudder attachments (Laser needs these; you already have them) 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+A4.5 Diagnostics (if ReferencePack present)
+
+Ortho renders
+
+Extracted silhouettes arrays
+
+Error arrays + fit report
+
+A5. Editor UX (minimum viable “diagram-style 3D editor”)
+
+You must ship these panels:
+
+OrthoViewGrid: top/side/front/rear with reference underlay + model silhouette
+
+SVG Overlay tools: draw ellipse/rect/spline → creates/edits nodes
+
+GraphEditor: stage-sorted node list (toggle, reorder within stage)
+
+ParamInspector: selected node params
+
+ErrorCurves: plots for eB,eK,eD in meters
+
+PatchTimeline: undo/redo and accept/reject fit patches
+
+A6. Acceptance tests (non-negotiable)
+
+ReferencePack underlays align in meters (scale bar matches world units)
+
+Rebuilding asset from same spec produces identical geometry (hash match)
+
+Feature enable/disable is reversible and deterministic
+
+LOD0/1/2 maintain silhouette within tolerance
+
+AssetBundle exports valid GLB and manifest
+
+Fit loop computes non-empty error arrays and produces a patch that can be applied/reverted
+
+Deliverable B — Laser Pack v1 Spec (preset + features + build config)
+
+This is a starter pack designed to be refined by your ortho fitting loop. It intentionally exposes the same conceptual controls you already have (length/beam/height, taper, rocker, bow lift, stern deck drop, V-hull depth, bow tip shaping, cockpit cutout, etc.). 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+ 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+B0. Files
+assets/presets/laser/
+  LaserPreset_v1.json
+  LaserFeatures_v1.json
+  LaserBuildConfig_v1.json
+  LaserHardpoints_v1.json
+  LaserProxies_v1.json
+
+B1. LaserPreset_v1.json
+
+Values below are “reasonable placeholders”. Your ReferencePack fitting should tune them.
+
+{
+  "id": "laser_preset_v1",
+  "units": "meter",
+
+  "base": {
+    "L": 4.20,
+    "Nu": 256,
+    "Nv": 96,
+
+    "curves": {
+      "B": { "type": "bezier", "u": [0,0.2,0.5,0.8,1.0], "v": [0.02,0.45,0.60,0.38,0.03] },
+      "K": { "type": "bezier", "u": [0,0.25,0.5,0.75,1.0], "v": [0.02,0.00,-0.01,0.00,0.02] },
+      "D": { "type": "bezier", "u": [0,0.25,0.5,0.75,1.0], "v": [0.18,0.20,0.21,0.20,0.19] }
+    },
+
+    "sectionStations": [
+      {
+        "u": 0.12,
+        "params": { "vDepth": 0.55, "deadrise": 0.65, "bilgeRadius": 0.55, "chineSharpness": 0.15, "flare": 0.10, "railRadius": 0.55, "bodyPow": 0.55 }
+      },
+      {
+        "u": 0.50,
+        "params": { "vDepth": 0.45, "deadrise": 0.50, "bilgeRadius": 0.70, "chineSharpness": 0.10, "flare": 0.08, "railRadius": 0.65, "bodyPow": 0.65 }
+      },
+      {
+        "u": 0.86,
+        "params": { "vDepth": 0.35, "deadrise": 0.40, "bilgeRadius": 0.75, "chineSharpness": 0.08, "flare": 0.06, "railRadius": 0.70, "bodyPow": 0.75 }
+      }
+    ],
+
+    "envelopes": {
+      "rocker": { "amp": 0.06, "bowU": 0.92, "sternU": 0.08, "width": 0.18, "power": 1.6 },
+      "bowLift": { "amp": 0.03, "u0": 0.94, "width": 0.10, "power": 1.8 },
+      "sternDeckDrop": { "amp": 0.02, "u0": 0.08, "width": 0.12, "power": 1.6 },
+
+      "bowTip": { "point": 0.70, "round": 0.55, "lengthU": 0.05 }
+    }
+  },
+
+  "regions": {
+    "hull": { "chart": "hullSide" },
+    "deck": { "chart": "deckTop" },
+    "rail": { "chart": "railBand" }
+  }
+}
+
+
+Notes:
+
+B(u) values are half-beam in meters; they will be tuned from the top ortho silhouette.
+
+K(u) and D(u) are heights in meters relative to your chosen origin datum.
+
+Rocker/bowLift/sternDeckDrop/bowTip correspond to your current hull sculpting controls (rockerAmp, bowLiftAmp, sternDeckDrop, bowTipPoint/bowTipRound). 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+ 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+B2. LaserFeatures_v1.json
+Macro: cockpit + trunk
+{
+  "id": "laser_features_v1",
+  "nodes": [
+    {
+      "id": "cockpit_recess",
+      "type": "RecessCut",
+      "stage": "MACRO",
+      "enabled": true,
+      "targetRegions": ["deck"],
+      "placement": { "mode": "UV", "u0": 0.36, "s0": 0.15, "yaw": 0.0 },
+      "mask": { "kind": "roundedRect", "uMin": 0.24, "uMax": 0.52, "sMin": 0.02, "sMax": 0.42, "r": 0.04, "pow": 1.2 },
+      "params": { "depth": 0.10, "rimWidth": 0.025, "rimHeight": 0.010, "rimRoundness": 0.75 }
+    },
+    {
+      "id": "centerboard_trunk_step",
+      "type": "PatchDisplace",
+      "stage": "MACRO",
+      "enabled": true,
+      "targetRegions": ["deck"],
+      "placement": { "mode": "UV", "u0": 0.33, "s0": 0.08, "yaw": 0.0 },
+      "mask": { "kind": "roundedRect", "uMin": 0.30, "uMax": 0.38, "sMin": 0.00, "sMax": 0.22, "r": 0.02, "pow": 1.4 },
+      "params": { "height": 0.025, "profile": "plateau", "normalMode": "up" }
+    },
+    {
+      "id": "centerboard_slot_imprint",
+      "type": "RecessCut",
+      "stage": "MACRO",
+      "enabled": true,
+      "targetRegions": ["deck"],
+      "placement": { "mode": "UV", "u0": 0.34, "s0": 0.02, "yaw": 0.0 },
+      "mask": { "kind": "roundedRect", "uMin": 0.325, "uMax": 0.355, "sMin": 0.00, "sMax": 0.06, "r": 0.008, "pow": 1.6 },
+      "params": { "depth": 0.04, "rimWidth": 0.006, "rimHeight": 0.004, "rimRoundness": 0.6 }
+    },
+
+    {
+      "id": "rail_seam_crease",
+      "type": "CreaseLine",
+      "stage": "EDGE",
+      "enabled": true,
+      "targetRegions": ["rail"],
+      "placement": { "mode": "UV", "u0": 0.5, "s0": 1.0, "yaw": 0.0 },
+      "mask": { "kind": "curveBand", "curveId": "railCurve", "width": 0.020, "sharpness": 2.2 },
+      "params": { "depth": 0.006, "bias": 0.0, "direction": "normal" }
+    },
+
+    {
+      "id": "bow_tip_refine",
+      "type": "VectorWarp",
+      "stage": "EDGE",
+      "enabled": true,
+      "targetRegions": ["hull"],
+      "placement": { "mode": "UV", "u0": 0.97, "s0": 0.0, "yaw": 0.0 },
+      "mask": { "kind": "ellipse", "u": 0.97, "s": 0.08, "ru": 0.05, "rs": 0.18, "pow": 1.8 },
+      "params": { "dir": "forward", "amp": 0.008, "profile": "bell" }
+    },
+
+    {
+      "id": "rudder_gudgeon_pad",
+      "type": "BossHole",
+      "stage": "MICRO",
+      "enabled": true,
+      "targetRegions": ["hull"],
+      "placement": { "mode": "UV", "u0": 0.06, "s0": 0.0, "yaw": 0.0 },
+      "mask": { "kind": "ellipse", "u": 0.06, "s": 0.08, "ru": 0.02, "rs": 0.10, "pow": 1.6 },
+      "params": { "bossHeight": 0.006, "bossProfile": "plateau", "holeRadius": 0.0, "holeDepth": 0.0 }
+    }
+  ]
+}
+
+
+This directly mirrors the monolith’s intent: cockpit cutout, trunk, bow tip shaping, stern deck effects, and attachment points. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+B3. LaserHardpoints_v1.json
+
+Seed with the Laser hardpoints you already defined (mast base, gooseneck, trunk, traveler port/starboard, mainsheet base, rudder pivot, vang base, etc.). 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+{
+  "id": "laser_hardpoints_v1",
+  "hardpoints": [
+    { "id":"mast_base", "attach":"asset", "def": { "mode":"UV", "region":"deck", "u":0.56, "s":0.00, "h":1.0, "normalHint":"up" } },
+    { "id":"gooseneck", "attach":"asset", "def": { "mode":"UV", "region":"deck", "u":0.57, "s":0.00, "h":1.0, "normalHint":"up" } },
+
+    { "id":"centerboard_trunk", "attach":"asset", "def": { "mode":"UV", "region":"deck", "u":0.52, "s":0.00, "h":1.0, "normalHint":"up" } },
+
+    { "id":"traveler_port", "attach":"asset", "def": { "mode":"UV", "region":"deck", "u":0.20, "s":0.26, "h":1.0, "normalHint":"up" } },
+    { "id":"traveler_starboard", "attach":"asset", "def": { "mode":"UV", "region":"deck", "u":0.20, "s":0.26, "h":1.0, "normalHint":"up" } },
+
+    { "id":"mainsheet_base", "attach":"asset", "def": { "mode":"UV", "region":"deck", "u":0.20, "s":0.00, "h":1.0, "normalHint":"up" } },
+
+    { "id":"rudder_pivot", "attach":"asset", "def": { "mode":"UV", "region":"hull", "u":0.08, "s":0.00, "h":0.75, "normalHint":"up" } },
+    { "id":"vang_base", "attach":"asset", "def": { "mode":"UV", "region":"deck", "u":0.55, "s":0.00, "h":1.0, "normalHint":"up" } }
+  ]
+}
+
+
+(You’ll map these to your exact current values; the monolith shows the general set and intent.) 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+B4. LaserProxies_v1.json
+
+Must support both:
+
+union-of-spheres hull displacement into water
+
+buoyancy sample points (<= 64)
+
+Your current system already uses spheres for hull-water coupling and capped buoyancy samples. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+{
+  "id": "laser_proxies_v1",
+  "hullSpheres": {
+    "generator": "stationGrid",
+    "stationsU": 14,
+    "rowsS": [0.10, 0.45, 0.85],
+    "radiusScale": [0.10, 0.14, 0.10],
+    "displacementScale": 1.0
+  },
+  "buoyancySamples": {
+    "maxSamples": 64,
+    "pattern": "uGrid_sGrid",
+    "uCount": 8,
+    "sCount": 4,
+    "yOffset": -0.02
+  }
+}
+
+B5. LaserBuildConfig_v1.json
+{
+  "id": "laser_buildconfig_v1",
+  "lods": [
+    { "name":"LOD0", "Nu":256, "Nv":96, "dropStages": [] },
+    { "name":"LOD1", "Nu":160, "Nv":64, "dropStages": ["MICRO"] },
+    { "name":"LOD2", "Nu":96,  "Nv":40, "dropStages": ["MICRO","EDGE"] }
+  ],
+  "collision": {
+    "mode": "hybrid",
+    "useLOD": "LOD2",
+    "primitives": [
+      { "type":"capsule", "fromHardpoint":"mast_base", "axis":"Y", "radius":0.08, "halfLength":0.9 },
+      { "type":"box", "center":[0,0,0], "size":[3.2,0.35,1.1] }
+    ]
+  },
+  "export": { "format":"glb", "includeDiagnostics": true }
+}
+
+Deliverable C — One-shot “Build This Repo” Prompt Contract
+
+Use this prompt verbatim with your builder agent (Opus/Claude/Cursor agent/etc.). It’s written as a hard contract: what to build, where, and what must work.
+
+You are building a production-grade Universal Parametric Asset Engine for Three.js (TypeScript + React Three Fiber). You MUST implement the repo according to the following contract:
+
+GOAL:
+- Deterministic parametric asset compiler that outputs a full AssetBundle: render LODs, collision, proxies, hardpoints, and diagnostics.
+- Provide an editor UI that is a diagram-style 3D editor: SVG overlay creates feature nodes; node list is staged; patch timeline supports undo/redo.
+- First shipped asset: Laser sailboat hull pack (curve-first base + cockpit/trunk + rail seam + rudder pad + hardpoints + proxies), with ortho underlay alignment and silhouette-error diagnostics.
+
+NON-NEGOTIABLE STRUCTURE:
+Create the file structure exactly:
+src/parametric/core, templates, features, reference, compiler, app/editor, app/demo
+assets/reference_packs, assets/presets, assets/bundles
+
+IMPLEMENTATION STEPS (must be completed in order):
+1) Core Types + Determinism
+   - Implement types: Curve1D, SectionParams, FeatureNode, MaskSpec, ReferencePack, ParamPatch, AssetBundleManifest.
+   - Implement hashing for spec+patches+buildconfig so same inputs -> same hash.
+
+2) Curve-First Base Template (BoatHullTemplate)
+   - Implement base shell generation using curves B(u), K(u), D(u) and section law F(s; params).
+   - Generate separate charts: hullSide, deckTop, railBand.
+   - Every vertex MUST store u, s, side attributes.
+
+3) Feature Primitives (5 types)
+   - PatchDisplace (normal-based or directional)
+   - RecessCut (depth + rim width/height + rim rounding)
+   - CreaseLine (curveBand mask + sharpness)
+   - VectorWarp (vector field displacement)
+   - BossHole (composed boss + optional hole depression)
+   - Feature graph must compile into ordered stage passes: MACRO -> EDGE -> MICRO.
+
+4) Masks
+   - Implement ellipse, roundedRect, curveBand, boolean ops union/intersect/subtract with falloff exponent.
+
+5) ReferencePack Ortho Underlay
+   - Implement ReferencePack schema and loader.
+   - Implement OrthoViewGrid: top/side/front/rear orthographic cameras.
+   - Place reference images as metric-correct planes using pxPerMeter + centerline + anchors.
+   - Underlay opacity adjustable.
+
+6) Silhouette Extraction + Error Curves
+   - Render offscreen binary silhouette for each view.
+   - Extract per-column extrema arrays:
+     TOP -> halfBeam_model(x)
+     SIDE -> K_model(x) bottom, D_model(x) top
+   - Extract same from reference image (thresholded).
+   - Compute error arrays eB/eK/eD in meters and show in ErrorCurves panel.
+
+7) Patch Protocol + Timeline
+   - Implement ParamPatch apply/revert.
+   - Maintain patches.jsonl (append-only) and a patch timeline UI with undo/redo.
+
+8) Compiler + AssetBundle
+   - Implement compileAsset(spec, buildConfig, referencePack?)
+   - Build LODs by resampling (Nu,Nv), dropping stages as configured.
+   - Build collision: hybrid mode supports primitives + optional LOD2 collision mesh.
+   - Build proxies: union-of-spheres and buoyancy sample points (cap 64).
+   - Build hardpoints: resolve world transforms from UV definitions.
+   - Export glb per LOD and write manifest.json.
+
+9) Laser Pack v1
+   - Add preset files:
+     assets/presets/laser/LaserPreset_v1.json
+     LaserFeatures_v1.json
+     LaserBuildConfig_v1.json
+     LaserHardpoints_v1.json
+     LaserProxies_v1.json
+   - Build a LaserDemoScene that loads the preset and shows:
+     - 3D view of hull
+     - OrthoViewGrid with underlay toggles
+     - Feature list and param inspector
+     - Error curves computed (even if not perfect)
+     - Patch timeline with at least one patch applied
+
+ACCEPTANCE TESTS (must pass):
+- Determinism: rebuilding same spec produces identical hash and identical vertex positions (within float epsilon).
+- Underlay alignment: the 1m bar in a ReferencePack matches 1m in world scale in the ortho view.
+- Silhouette extraction produces non-empty arrays for model and reference.
+- Error curves eB/eK/eD render and update when curves or features change.
+- Toggling cockpit feature changes the deck silhouette.
+- AssetBundle export produces:
+  assets/bundles/laser_preset_v1/manifest.json
+  meshes/LOD0.glb, LOD1.glb, LOD2.glb
+  hardpoints/hardpoints.json
+  proxies/buoyancySpheres.json and/or buoyancySamples.json
+  diagnostics/error_curves.json and ortho png renders (if includeDiagnostics true)
+
+CONSTRAINTS:
+- Do NOT use destructive boolean mesh ops as the primary approach for cockpit; use RecessCut deformation.
+- Do NOT implement a complex node-graph UI first; staged node list is acceptable.
+- All parameters must be bounded and validated; patches outside bounds must be rejected.
+
+DELIVERABLE:
+Provide complete working code, with Laser demo runnable, and AssetBundle compiler producing outputs.
+
+End of contract.
+
+
+
+
+
+Step 6.9 — ReferencePack Calibration Workflow + First-Fit Automation Loop (Laser-first, universal forever)
+
+Quick correction: in my earlier “Deliverable A/B/C” I referenced your monolith without actually quoting it. I’ve now pulled the exact Laser hull + settings details from SAILBOAT_SYSTEM_MONOLITH.md so what follows matches your current system precisely. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+ 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+Part 1 — ReferencePack calibration (turn ortho images into metric truth)
+
+Your monolith already assumes a Laser hull built by sculpting a subdivided box, controlled by parameters like bowTaperMin, sternTaperMin, taperPower, vHullDepth, rockerAmp, bowLiftAmp, sternDeckDrop, bowTipPoint, bowTipRound, plus cockpit position/size. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+ 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+
+ReferencePack calibration is simply: how to place an image so 1 meter in pixels = 1 meter in world, and the image centerline aligns to the model centerline.
+
+1.1 The calibration UI (minimum tools)
+
+For each view (TOP / SIDE / FRONT / REAR), your overlay needs exactly 4 tools:
+
+Scale tool: click two pixels A,B on the image + enter known meters d_m
+
+Centerline tool: click two pixels defining the symmetry axis
+
+Origin tool: click a pixel that you define as (0,0) for that view plane
+
+Nudge tool: optional tiny translation/rotation adjustments (stored as deltas)
+
+That’s it. Everything else is derived.
+
+1.2 What “known meters” should be
+
+You have three options (pick one per view and stay consistent):
+
+Use a scale bar embedded in the image (best)
+
+Use a known overall dimension from your own hull settings (practical)
+
+Use two anchors you already know in world (mast base ↔ transom center, etc.)
+
+Since your Laser hull already has a length/beam/height setting block, you can use those values as calibration distances. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+1.3 Calibration math (simple + stable)
+
+Let pixel points be A_px, B_px and known distance be d_m.
+
+d_px = ||B_px - A_px||
+
+pxPerMeter = d_px / d_m
+
+metersPerPx = 1 / pxPerMeter
+
+Centerline:
+
+you click two points C0_px, C1_px
+
+the centerline direction angle is θ = atan2(C1.y - C0.y, C1.x - C0.x)
+
+you store that so the image plane can be rotated to align the model axis
+
+Origin:
+
+you click O_px
+
+store it; this becomes (0,0) in that view’s metric plane
+
+1.4 Writing the ReferencePack JSON (per view)
+
+Store exactly what you need; nothing more:
+
+{
+  "id": "laser_refpack_v1",
+  "units": "meter",
+  "views": {
+    "top": {
+      "image": "assets/reference_packs/laser/top.png",
+      "cal": {
+        "pxPerMeter": 512.0,
+        "originPx": [312, 840],
+        "centerlinePx": [[310, 100], [314, 980]]
+      },
+      "opacity": 0.45
+    }
+  }
+}
+
+1.5 Placing the underlay in Three.js (canonical)
+
+For a view image of size Wpx × Hpx:
+
+plane width in meters: Wm = Wpx / pxPerMeter
+
+plane height in meters: Hm = Hpx / pxPerMeter
+
+Set plane geometry (Wm, Hm).
+
+To place pixel originPx at world origin on that plane:
+
+pixel coordinate in meters relative to image center:
+
+ox = (originPx.x - Wpx/2) / pxPerMeter
+
+oy = (originPx.y - Hpx/2) / pxPerMeter
+
+then translate plane by (-ox, -oy) in the plane’s local axes.
+
+Rotate the plane about its normal so the stored centerline aligns to your world axis.
+
+1.6 View axis conventions (make this consistent once)
+
+Pick and lock:
+
+TOP plane lies in (X,Z)
+
+SIDE plane lies in (X,Y)
+
+FRONT/REAR planes lie in (Z,Y)
+
+Your monolith already defines boat-local axes as Forward +X, Up +Y, Starboard +Z. Match that everywhere. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+Part 2 — First-fit automation loop (error curves → bounded patches)
+
+You want this to feel like “diagnostics”, not “guesswork”.
+
+Your current hull is sculpted with explicit parameters (taper, V depth, rocker, bow lift, bow tip, stern deck drop, cockpit cutout). 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+
+So the automation loop should output patches in that parameter space first, even before you fully migrate to spline-only curves.
+
+2.1 What to extract from renders
+
+From each ortho view, extract 1D functions using scanline extrema:
+
+TOP → half-beam curve
+
+For each x-column:
+
+B_model[x] = 0.5 * (z_right - z_left) in meters
+
+SIDE → bottom + deck curves
+
+For each x-column:
+
+K_model[x] = y_bottom(x) in meters
+
+D_model[x] = y_top(x) in meters
+
+These map directly to your conceptual controls:
+
+width errors → taper, beam, bow/stern shaping
+
+bottom errors → rockerAmp, bowLiftAmp, vHullDepth interactions
+
+deck errors → sternDeckDrop, deck rounding logic
+
+2.2 Error arrays
+
+Compute:
+
+eB(x) = B_model(x) - B_ref(x)
+
+eK(x) = K_model(x) - K_ref(x)
+
+eD(x) = D_model(x) - D_ref(x)
+
+Also compute:
+
+rmsB, rmsK, rmsD
+
+maxB, maxK, maxD
+
+2.3 Parameter map for the Laser hull (your current action space)
+
+Directly from your settings schema, the Laser hull controls include:
+length, height, beam, bowTaperMin, sternTaperMin, taperPower, rockerAmp, bowLiftAmp, sternDeckDrop, vHullDepth, bowTipPoint, bowTipRound, plus cockpit position/size. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+That means we can define a safe first-fit patch generator:
+
+Global scale sanity
+
+If mean(eB) is uniformly positive across most x → reduce beam
+
+If mean(eD) uniformly positive → reduce height or deck bias
+
+If model length doesn’t match end-to-end silhouette → adjust length
+
+Bow/stern planform shaping (TOP-driven)
+
+Look at eB(x) near ends:
+
+Bow region window: x ∈ [0.85..1.0]
+
+too wide → decrease bowTaperMin or increase taperPower
+
+too narrow → increase bowTaperMin or decrease taperPower
+
+Stern region window: x ∈ [0.0..0.15]
+
+too wide → decrease sternTaperMin or increase taperPower
+
+too narrow → increase sternTaperMin or decrease taperPower
+
+This matches your monolith’s sculpt steps for taper and taperPower. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+Rocker + bow lift (SIDE-driven, bottom curve)
+
+If eK(x) is positive near both ends (bottom too low or too “deep” relative to ref) → increase rockerAmp (lifts ends)
+
+If only bow end is off (bow too low) → increase bowLiftAmp
+
+If stern bottom is off but bow is fine → adjust rocker envelope (or add stern-specific lift if you split it later)
+
+These exist explicitly in your hull sculpt list. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+Stern deck drop (SIDE-driven, top curve near stern)
+
+If eD(x) is positive near stern (deck too high) → increase sternDeckDrop
+
+If deck is too low → decrease it
+
+Again directly in your sculpt list. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+V-hull depth (FRONT/REAR-guided, plus side bottom curvature)
+
+If midship bottom silhouette is too “flat” relative to ref → increase vHullDepth
+
+If too sharp/deep V → decrease it
+
+You already model this as a scalar. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+Bow tip shaping (TOP + SIDE very near bow)
+
+If bow tip is too blunt (planform tip wide) → increase bowTipPoint
+
+If rails pinch too sharply → increase bowTipRound (soften)
+These are explicitly named parameters. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+Cockpit (TOP/SIDE local residual)
+
+Cockpit is parameterized as cockpit.main.position and cockpit.main.size. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+
+Local mismatch in the cockpit zone should produce patches only to those fields (not global hull).
+
+2.4 The bounded patch generator (deterministic)
+
+Define bounds per parameter and a maximum step per iteration:
+
+Example (tune later):
+
+beam: step ≤ 0.01 m
+
+bowTaperMin/sternTaperMin: step ≤ 0.01
+
+taperPower: step ≤ 0.05
+
+rockerAmp: step ≤ 0.005
+
+bowLiftAmp: step ≤ 0.003
+
+sternDeckDrop: step ≤ 0.003
+
+vHullDepth: step ≤ 0.005
+
+cockpit position: step ≤ 0.005 m
+
+cockpit size: step ≤ 0.01 m
+
+Patch synthesis rule
+
+For each parameter p:
+
+compute a signed “suggested delta” Δp_raw from the relevant error integrals
+
+clamp to [-stepMax, +stepMax]
+
+clamp to parameter bounds
+
+emit as a patch
+
+2.5 Concrete heuristic formulas (works shockingly well)
+
+Let E(win) be the mean error over a window.
+
+Windows (in normalized x):
+
+W_bow = [0.90..1.00]
+
+W_stern = [0.00..0.10]
+
+W_mid = [0.45..0.55]
+
+Then:
+
+Δbeam = -kB * E(eB, full)
+
+ΔbowTaperMin = -kT * E(eB, W_bow)
+
+ΔsternTaperMin = -kT * E(eB, W_stern)
+
+ΔtaperPower = +kP * ( sign(E(eB,W_bow)) * |E(eB,W_bow)| + sign(E(eB,W_stern)) * |E(eB,W_stern)| )
+
+Bottom:
+
+ΔrockerAmp = +kR * (E(eK,W_bow) + E(eK,W_stern))
+
+ΔbowLiftAmp = +kL * E(eK, W_bow)
+
+Deck:
+
+ΔsternDeckDrop = +kD * E(eD, W_stern)
+
+V:
+
+ΔvHullDepth = -kV * E(flatnessError, W_mid)
+(where flatnessError can be derived from front/rear section profile mismatch; if you don’t have it yet, start with side-bottom curvature residual at midship)
+
+Pick small gains:
+
+kB≈0.6, kT≈0.8, kP≈0.4, kR≈0.5, kL≈0.35, kD≈0.35, kV≈0.5
+Then clamp hard.
+
+This yields conservative, convergent motion.
+
+2.6 Optimization schedule (multi-scale, no chaos)
+
+Run in phases:
+
+Phase 0 — sanity
+
+fit length/beam/height to bring RMS into reasonable range
+
+Phase 1 — planform
+
+iterate on bowTaperMin/sternTaperMin/taperPower/beam/bowTipPoint/bowTipRound using TOP only
+
+Phase 2 — rocker + deck
+
+iterate on rockerAmp/bowLiftAmp/sternDeckDrop/height using SIDE only
+
+Phase 3 — V-hull
+
+tune vHullDepth using FRONT/REAR cues (or midship side residual until you implement section extraction)
+
+Phase 4 — cockpit local
+
+adjust cockpit position/size only if mismatch is localized to its zone
+
+This exactly mirrors your current sculpt sequence in code: taper → V-hull → rocker/bow lift → cockpit → bow tip → stern deck drop. 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+Part 3 — “LLM-assisted fit” protocol (optional, but extremely powerful)
+
+If you want to let a model propose patches:
+
+Inputs you provide
+
+4 ortho renders (model + reference overlay)
+
+error arrays eB,eK,eD (or plotted PNGs)
+
+current parameter block (boatBuilder.laser.hull + cockpit fields)
+
+bounds + stepMax rules
+
+objective: decrease RMS without increasing fairness penalty
+
+Output you accept
+
+Only a JSON patch to these whitelisted paths:
+
+boatBuilder.laser.hull.* fields listed in your schema 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+boatBuilder.laser.cockpit.main.position/size 
+
+SAILBOAT_SYSTEM_MONOLITH
+
+Everything else rejected.
+
+Part 4 — Implementation checklist (fastest path to “it works”)
+4.1 Minimum code you must add first
+
+ReferencePack editor (scale + centerline + origin tools)
+
+Underlay plane placement (metric correct)
+
+Binary silhouette render pass
+
+Scanline extrema extractor (TOP and SIDE first)
+
+Error curves view (plots in meters)
+
+Heuristic patch generator (Phase 0–2)
+
+Patch apply/revert + timeline
+
+Once TOP+SIDE fit is working, you can add FRONT/REAR section fitting.
+
+
+GraphTemplate spec that plugs into your existing curve/feature compiler and instantly unlocks:
+
+bicycle wheels (32 spokes, 2-cross/3-cross)
+
+aircraft ribs + stringers
+
+veins (leaf, wings)
+
+trees + branching
+
+human skeleton (bone graph + joints)
+
+pipes/cables/wiring
+
+architectural trusses
+
+Think of it as: Shells are surfaces; Graphs are structures. Most “complex objects” are both.
+
+1) The Big Unification
+
+You already have:
+
+SurfaceTemplate: curve-first hull/body shells with (u,s,side) design attributes
+
+FeatureGraph: local edits (recess, bulge, crease, warp, boss)
+
+Add:
+
+GraphTemplate: nodes + edges + sweep profiles + arrays + junctions
+
+GraphFeatures: same patch/crease/recess logic, but applied to edges/tubes or junction shells
+
+Then everything becomes presets.
+
+2) GraphTemplate Core Types
+2.1 Coordinate spaces (critical)
+
+A graph element can live in:
+
+WORLD (absolute)
+
+LOCAL (asset-space)
+
+SURFACE (anchored to a SurfaceTemplate chart; stable under mesh resolution changes)
+
+Surface anchoring is the superpower: a spoke hole “sticks” to the rim even if you resample LODs.
+
+2.2 Minimal TS-style schema
+export type Space = "WORLD" | "LOCAL" | "SURFACE";
+
+export type Frame = {
+  pos: [number, number, number];         // x,y,z
+  rot: [number, number, number, number]; // quaternion
+};
+
+export type SurfaceAnchor = {
+  templateId: string;    // e.g. "BoatHullTemplate"
+  region: string;        // "deck", "hull", "rail", "rim", etc.
+  uv: [number, number];  // stable param space
+  offset?: [number, number, number]; // along local tangent/normal basis
+};
+
+export type NodeSpec = {
+  id: string;
+  space: Space;
+  frame?: Frame;               // when space WORLD/LOCAL
+  anchor?: SurfaceAnchor;      // when space SURFACE
+  role?: "joint"|"hub"|"rim"|"branch"|"mount"|"control";
+  meta?: Record<string, any>;
+};
+
+export type SweepProfile =
+  | { kind:"circle"; r:number }
+  | { kind:"ellipse"; rx:number; rz:number }
+  | { kind:"tube"; r0:number; r1:number }               // linear taper
+  | { kind:"custom2D"; points:[number,number][], scale?:number };
+
+export type RadiusLaw = {
+  // radius or profile scaling along edge t in [0,1]
+  kind: "constant" | "linear" | "bezier" | "curve";
+  params: any;
+};
+
+export type EdgePath =
+  | { kind:"line" }
+  | { kind:"arc"; axis:"X"|"Y"|"Z"; angle:number }
+  | { kind:"spline"; points:[number,number,number][] }  // local control points
+  | { kind:"surfaceGeodesic"; region:string; uv0:[number,number]; uv1:[number,number] };
+
+export type EdgeSpec = {
+  id: string;
+  a: string;  // node id
+  b: string;  // node id
+
+  path?: EdgePath;         // default line between nodes
+  profile: SweepProfile;   // cross-section
+  radiusLaw?: RadiusLaw;   // optional scaling along edge
+  twist?: number;          // radians along length
+  segments?: number;       // sampling quality
+
+  // “cable/rope” optional physics hint
+  phys?: { kind:"rigid"|"cable"; massPerM?:number; stiffness?:number };
+
+  meta?: Record<string, any>;
+};
+
+export type JunctionSpec = {
+  id: string;
+  nodeId: string; // where edges meet
+  kind: "cap"|"hubShell"|"blend";
+  radius?: number;
+  smooth?: number; // blend feel
+  meta?: Record<string, any>;
+};
+
+export type GraphSpec = {
+  id: string;
+  nodes: NodeSpec[];
+  edges: EdgeSpec[];
+  junctions?: JunctionSpec[];
+
+  // pattern operators compiled into nodes/edges
+  operators?: OperatorSpec[];
+
+  // constraints are checks (and optional solvers) to keep it “real”
+  constraints?: ConstraintSpec[];
+
+  // hardpoints resolved from nodes or anchors
+  hardpoints?: HardpointSpec[];
+};
+
+
+This is enough to build: spokes, ribs, veins, branches, bones, trusses.
+
+3) Operators (the “make 32 spokes” button)
+
+Operators don’t generate triangles. They generate graph elements deterministically.
+
+3.1 RadialArray operator (mandatory)
+export type OperatorSpec =
+  | {
+      kind:"radialArray";
+      sourceNodeIds?: string[];
+      sourceEdgeIds?: string[];
+      center: Frame;          // axis + origin
+      axis: "X"|"Y"|"Z";
+      count: number;          // 32
+      angleOffset?: number;   // radians
+      mirrorSide?: boolean;   // for left/right flange
+    }
+  | { kind:"mirror"; plane:"YZ"|"XZ"|"XY"; sourceIds:string[] }
+  | { kind:"lattice"; ... }
+  | { kind:"growth"; ... };
+
+
+RadialArray is the one that unlocks:
+
+spoke patterns
+
+turbine blades
+
+rib stations
+
+flower petals
+
+column arrays
+
+4) Junctions (how spokes meet hubs cleanly)
+
+You need three junction modes—simple → advanced.
+
+4.1 Cap (fastest)
+
+Each edge gets an end cap (flat/round). Good for LODs and hidden interiors.
+
+4.2 HubShell (recommended default)
+
+At node N, generate a small shell (sphere-ish or custom) and attach edges with smooth tangency. This avoids expensive boolean operations and remains game-friendly.
+
+4.3 Blend (optional)
+
+If you ever want truly organic merges (roots, veins), you can do local implicit blending and remesh, but that’s “nice-to-have,” not required for your production path.
+
+5) WheelGraphPreset (32 spokes + 3-cross) — the real unlock
+
+A laced wheel is not “modeling.” It’s a mapping.
+
+5.1 Wheel parameters
+
+N = 32 spokes
+
+R_rim rim radius
+
+R_hub hub flange radius
+
+flangeOffsetY half distance between hub flanges (left/right)
+
+cross = 0|1|2|3
+
+holesRim = N, holesHub = N (often equal)
+
+twoSided = true (left/right spokes)
+
+5.2 Index mapping for lacing
+
+Let rim holes be i ∈ [0..N-1].
+For each rim hole i, choose hub hole index:
+
+radial: j = i
+
+cross k: j = (i + k*sign) mod N
+
+Where sign alternates to create left/right and leading/trailing symmetry.
+
+A clean deterministic scheme:
+
+Split spokes into 4 groups:
+LeftLeading, LeftTrailing, RightLeading, RightTrailing
+
+Each group uses:
+
+flange = left or right
+
+tangential direction = + or −
+
+hub index offset = ±cross
+
+So for each rim index i:
+
+group = i mod 4
+
+side = left if group ∈ {0,1}, right if {2,3}
+
+dirSign = +1 for leading groups, −1 for trailing groups
+
+hubHole = (i + dirSign*cross) mod N
+
+That generates classic 2-cross/3-cross “twist” without hand modeling.
+
+5.3 Graph construction steps
+
+Create rim circle nodes (optional: you can use one rim node + edges to hole nodes)
+
+Create hub flange nodes: left and right circles
+
+For each i:
+
+define rim hole node at angle θ_i = 2π i/N
+
+define hub hole node at angle θ_j
+
+connect with a spoke edge (spline path with slight curvature)
+
+You can optionally model spokes as straight lines (good enough), or add a 1-control-point spline to simulate real spoke bow.
+
+6) Plants / Veins / Branches — same graph, different operator
+6.1 Growth operator (branching)
+
+A growth operator generates new nodes/edges iteratively:
+
+start with trunk edge
+
+at certain t along the edge, spawn child edges with:
+
+angle distribution
+
+length falloff
+
+radius falloff
+
+noise
+
+That’s it. The rest is sweep geometry + junction shells.
+
+6.2 Veins
+
+A leaf is:
+
+midrib curve
+
+secondary veins as a curve array
+
+tertiary veins as a finer array
+All of those are just swept edges, possibly anchored to a leaf surface.
+
+7) Skeletons — bones are swept edges + joints are hardpoints
+
+A bone is:
+
+a centerline edge (spline)
+
+a radius law (thick at ends, thin mid)
+
+landmark bosses (feature nodes) at joint ends
+
+Joints are nodes with:
+
+hinge axis / limits
+
+parent/child relationships
+
+optional physics constraints
+
+So the “skeleton graph” directly becomes a ragdoll-ready rig.
+
+8) How GraphTemplate plugs into your existing compiler
+8.1 Compile order (safe default)
+
+Build SurfaceTemplate base meshes
+
+Apply Surface FeatureGraph (macro/edge/micro)
+
+Resolve GraphTemplate anchors (surface → world frames)
+
+Expand operators (radial arrays, growth, mirrors) into explicit nodes/edges
+
+Generate graph geometry:
+
+sweep each edge → tube mesh (or ribbon/strip)
+
+build junction shells at nodes
+
+Apply Graph FeatureGraph (creases, mounts, local warps on tubes if desired)
+
+Build outputs:
+
+LODs: reduce segments, drop micro edges, merge junctions
+
+Colliders: capsules per edge, spheres per node
+
+Hardpoints: node frames + selected surface anchors
+
+Export bundle
+
+8.2 LOD rules for graphs (game-perfect)
+
+LOD0: all edges, higher segments
+
+LOD1: fewer segments, thinner edges clamped to minimum pixel thickness
+
+LOD2: drop small branches/spokes OR replace with normal-mapped proxy mesh (optional)
+
+Collision: always capsule chains (super stable)
+
+9) Editor UX (your SVG method, extended cleanly)
+
+Add 3 tools—nothing more:
+
+Draw Curve → creates an edge (spline path)
+
+Radial Array → select edge(s) + pick axis + count
+
+Node Role Tool → click node → set role: hub/joint/mount
+
+Optional high power:
+
+“Snap to surface” toggle: nodes become SURFACE anchors (uv stored)
+
+Now you can author:
+
+spokes by drawing one spoke and radial-arraying it
+
+ribs by drawing one rib station and arraying along length
+
+veins by drawing one vein and distributing it with growth or array rules
+
+10) The minimum implementation that unlocks everything
+
+If you want the shortest path to “holy **** it works”:
+
+Implement only:
+
+GraphSpec (nodes/edges)
+
+Sweep (circle profile)
+
+RadialArray operator
+
+Capsule colliders from edges
+
+Node hardpoints
+
+First demo preset:
+
+Wheel32_3Cross
+
+hub + rim circles
+
+spoke mapping
+
+spokes as swept tubes
+
+hub shell junctions
+
+LOD downsampling
+
+Once that works, trees/ribs/bones are trivial presets.
+
+
+
+
+
+1) Concrete Presets (Wheel32_3Cross, TreeGrowth, SkeletonArm) in the GraphSpec schema
+
+I’m going to keep these exactly in the form your compiler can consume: nodes, edges, operators, junctions, constraints, hardpoints. You can paste these into assets/presets/... and immediately wire them.
+
+1.1 Wheel32_3Cross — preset JSON
+
+File: assets/presets/graphs/Wheel32_3Cross_v1.json
+
+{
+  "id": "Wheel32_3Cross_v1",
+  "nodes": [
+    { "id": "wheel_center", "space": "LOCAL", "frame": { "pos": [0,0,0], "rot": [0,0,0,1] }, "role": "hub" },
+
+    { "id": "hub_left_center",  "space": "LOCAL", "frame": { "pos": [0, 0.03, 0], "rot": [0,0,0,1] }, "role": "hub" },
+    { "id": "hub_right_center", "space": "LOCAL", "frame": { "pos": [0,-0.03, 0], "rot": [0,0,0,1] }, "role": "hub" },
+
+    { "id": "rim_center", "space": "LOCAL", "frame": { "pos": [0,0,0], "rot": [0,0,0,1] }, "role": "rim" }
+  ],
+
+  "operators": [
+    {
+      "kind": "radialArray",
+      "sourceNodeIds": ["rim_hole_proto"],
+      "center": { "pos": [0,0,0], "rot": [0,0,0,1] },
+      "axis": "Z",
+      "count": 32,
+      "angleOffset": 0.0
+    }
+  ],
+
+  "edges": [
+    {
+      "id": "rim_ring",
+      "a": "rim_center",
+      "b": "rim_center",
+      "path": { "kind": "arc", "axis": "Z", "angle": 6.283185307179586 },
+      "profile": { "kind": "circle", "r": 0.010 },
+      "segments": 192,
+      "meta": { "class": "rim" }
+    },
+
+    {
+      "id": "hub_left_ring",
+      "a": "hub_left_center",
+      "b": "hub_left_center",
+      "path": { "kind": "arc", "axis": "Z", "angle": 6.283185307179586 },
+      "profile": { "kind": "circle", "r": 0.006 },
+      "segments": 96,
+      "meta": { "class": "hub_flange_left" }
+    },
+    {
+      "id": "hub_right_ring",
+      "a": "hub_right_center",
+      "b": "hub_right_center",
+      "path": { "kind": "arc", "axis": "Z", "angle": 6.283185307179586 },
+      "profile": { "kind": "circle", "r": 0.006 },
+      "segments": 96,
+      "meta": { "class": "hub_flange_right" }
+    }
+  ],
+
+  "junctions": [
+    { "id": "j_rim", "nodeId": "rim_center", "kind": "hubShell", "radius": 0.02, "smooth": 0.8 },
+    { "id": "j_hubL", "nodeId": "hub_left_center", "kind": "hubShell", "radius": 0.012, "smooth": 0.8 },
+    { "id": "j_hubR", "nodeId": "hub_right_center", "kind": "hubShell", "radius": 0.012, "smooth": 0.8 }
+  ],
+
+  "constraints": [
+    { "kind": "radialSymmetry", "axis": "Z", "count": 32, "target": "spokes" },
+    { "kind": "minRadius", "value": 0.0015, "target": "spokes" }
+  ],
+
+  "hardpoints": [
+    { "id": "axle_center", "attach": "asset", "def": { "mode": "ANCHOR", "anchorId": "wheel_center", "offset": [0,0,0] }, "meta": { "role": "axle" } }
+  ],
+
+  "meta": {
+    "params": {
+      "N": 32,
+      "cross": 3,
+      "rimRadius": 0.33,
+      "hubRadius": 0.03,
+      "hubFlangeY": 0.03,
+      "spokeRadius": 0.0016
+    },
+    "spokeRouting": "3-cross, alternating lead/trail, left/right flanges",
+    "notes": "This preset expects the compiler to expand rim/hub hole nodes + spoke edges deterministically from params."
+  }
+}
+
+Important: where the spokes actually come from
+
+This preset is intentionally minimal because the real wheel intelligence belongs in a dedicated operator:
+
+WheelLacingOperator(N, cross, rimRadius, hubRadius, flangeY, spokeRadius)
+
+It generates:
+
+rim_hole_i nodes at radius rimRadius
+
+hub_left_hole_j, hub_right_hole_j nodes at radius hubRadius
+
+spoke edges mapping i -> j = (i ± cross) mod N with group alternation
+
+Why: You don’t want 64 nodes and 32 edges hardcoded; you want the operator to emit them.
+
+So: implement operators.kind = "wheelLacing" as a first “domain operator”. It’s still graph-native.
+
+1.2 TreeGrowth — preset JSON
+
+File: assets/presets/graphs/TreeGrowth_v1.json
+
+{
+  "id": "TreeGrowth_v1",
+  "nodes": [
+    { "id": "root", "space": "LOCAL", "frame": { "pos": [0,0,0], "rot": [0,0,0,1] }, "role": "branch" }
+  ],
+  "operators": [
+    {
+      "kind": "growth",
+      "sourceIds": ["root"],
+      "params": {
+        "steps": 8,
+        "branchFactor": 2,
+        "length0": 1.2,
+        "lengthFalloff": 0.72,
+        "radius0": 0.08,
+        "radiusFalloff": 0.68,
+        "splitAngleDeg": 32,
+        "yawNoiseDeg": 20,
+        "bendNoise": 0.15,
+        "seed": 1337
+      }
+    }
+  ],
+  "junctions": [
+    { "id": "j_all", "nodeId": "root", "kind": "hubShell", "radius": 0.10, "smooth": 0.9 }
+  ],
+  "constraints": [
+    { "kind": "minRadius", "value": 0.004, "target": "branches" }
+  ],
+  "meta": { "notes": "growth operator emits nodes+edges; edges swept as tubes; junction shells at each node." }
+}
+
+
+Operator output rules (must implement):
+
+each step expands tips
+
+each tip spawns 1–branchFactor children
+
+edge path is spline with bend noise
+
+radius law is taper (fat at base)
+
+stop spawning when radius < minRadius
+
+1.3 SkeletonArm — preset JSON
+
+File: assets/presets/graphs/SkeletonArm_v1.json
+
+{
+  "id": "SkeletonArm_v1",
+  "nodes": [
+    { "id": "shoulder_joint", "space": "LOCAL", "frame": { "pos": [0, 1.45, 0], "rot": [0,0,0,1] }, "role": "joint",
+      "meta": { "joint": { "kind": "ball", "limitDeg": 75 } } },
+
+    { "id": "elbow_joint", "space": "LOCAL", "frame": { "pos": [0.30, 1.10, 0], "rot": [0,0,0,1] }, "role": "joint",
+      "meta": { "joint": { "kind": "hinge", "axis": "Z", "minDeg": 0, "maxDeg": 145 } } },
+
+    { "id": "wrist_joint", "space": "LOCAL", "frame": { "pos": [0.55, 0.88, 0], "rot": [0,0,0,1] }, "role": "joint",
+      "meta": { "joint": { "kind": "hinge", "axis": "Z", "minDeg": -35, "maxDeg": 45 } } }
+  ],
+  "edges": [
+    {
+      "id": "humerus",
+      "a": "shoulder_joint",
+      "b": "elbow_joint",
+      "path": { "kind": "spline", "points": [[0,0,0], [0.12,-0.12,0.03], [0.30,-0.35,0]] },
+      "profile": { "kind": "ellipse", "rx": 0.032, "rz": 0.026 },
+      "radiusLaw": { "kind": "bezier", "params": { "r0": 1.15, "rMid": 0.75, "r1": 1.25 } },
+      "segments": 56,
+      "meta": { "bone": "humerus" }
+    },
+    {
+      "id": "radius_ulna_bundle",
+      "a": "elbow_joint",
+      "b": "wrist_joint",
+      "path": { "kind": "spline", "points": [[0,0,0], [0.15,-0.05,0.02], [0.25,-0.22,0]] },
+      "profile": { "kind": "ellipse", "rx": 0.022, "rz": 0.018 },
+      "radiusLaw": { "kind": "bezier", "params": { "r0": 1.10, "rMid": 0.70, "r1": 1.10 } },
+      "segments": 48,
+      "meta": { "bone": "forearm" }
+    }
+  ],
+  "junctions": [
+    { "id": "j_shoulder", "nodeId": "shoulder_joint", "kind": "hubShell", "radius": 0.045, "smooth": 0.8 },
+    { "id": "j_elbow",    "nodeId": "elbow_joint",    "kind": "hubShell", "radius": 0.035, "smooth": 0.8 },
+    { "id": "j_wrist",    "nodeId": "wrist_joint",    "kind": "hubShell", "radius": 0.030, "smooth": 0.8 }
+  ],
+  "hardpoints": [
+    { "id": "shoulder_hp", "attach": "asset", "def": { "mode": "ANCHOR", "anchorId": "shoulder_joint", "offset": [0,0,0] }, "meta": { "role": "joint" } },
+    { "id": "elbow_hp",    "attach": "asset", "def": { "mode": "ANCHOR", "anchorId": "elbow_joint",    "offset": [0,0,0] }, "meta": { "role": "joint" } },
+    { "id": "wrist_hp",    "attach": "asset", "def": { "mode": "ANCHOR", "anchorId": "wrist_joint",    "offset": [0,0,0] }, "meta": { "role": "joint" } }
+  ],
+  "constraints": [
+    { "kind": "jointLimits", "target": "meta.joint" }
+  ],
+  "meta": { "notes": "This can feed a ragdoll: joints are nodes; bones are swept edges." }
+}
+
+2) Architecture “ANYTHING” — buildings with materials + framing + MEP (electric/plumbing/HVAC)
+
+This is where your system becomes not just a modeler, but a construction engine.
+
+The trick: architecture is naturally multi-layered:
+
+Envelope (walls, floors, roof)
+
+Structure (studs, joists, beams, columns, trusses)
+
+MEP (mechanical/electrical/plumbing: pipes, ducts, conduits)
+
+Finishes (drywall, siding, tile, trim)
+
+Systems metadata (codes, clearances, load paths)
+
+Your engine can represent each layer with the same primitives:
+
+Envelope = SurfaceTemplate (shells + openings)
+
+Structure = GraphTemplate (stud lattice + joist grids + truss graphs)
+
+MEP = GraphTemplate (pipes/ducts/cables along routing graphs)
+
+Finishes = FeatureGraph (trim, reveals, offsets, seams)
+
+Metadata = constraints + hardpoints + “inspection views”
+
+2.1 Architecture Template Families (starter set)
+A) HouseTemplate
+
+input: footprint polygon, story heights, roof type
+
+output: wall shells, floor slabs, roof planes, openings
+
+B) FrameTemplate (structure)
+
+studs: vertical array along wall segments
+
+top/bottom plates: sweeps along wall edges
+
+joists: array in floor direction
+
+beams: stronger profiles where spans exceed limits
+
+trusses: graph operator for roof truss layout
+
+C) MEPTemplate
+
+plumbing: pipes with diameter rules + slope constraints (drain lines)
+
+HVAC: duct trunk + branches + registers
+
+electrical: conduit/cable trays + outlets/switches as hardpoints
+
+Each template compiles to geometry + collision + metadata.
+
+2.2 Materials are not “textures”—they’re systems
+
+For architecture you want materials as layer stacks:
+
+Example wall:
+
+exterior siding (render layer)
+
+sheathing (structural)
+
+studs (structural graph)
+
+insulation (volume proxy)
+
+drywall (render layer)
+
+So define MaterialStack:
+
+type MaterialLayer = {
+  name: string;
+  thicknessM: number;
+  kind: "render"|"structural"|"thermal"|"acoustic"|"fire";
+  phys?: { density?: number; stiffness?: number; conductivity?: number };
+  render?: { materialId: string };
+};
+
+type MaterialStack = {
+  id: string;
+  layers: MaterialLayer[];
+};
+
+
+Then your ThicknessNode can generate correct offsets per layer (or at least per structural vs render).
+
+2.3 Structural realism via constraints (the “codes” layer)
+
+You don’t need full civil engineering to get massive value. You need constraints that prevent impossible layouts:
+
+Structural constraints (starter)
+
+max joist span for given spacing/profile (rule table)
+
+min bearing length on supports
+
+column spacing bounds
+
+truss web angle bounds
+
+minimum thickness for load-bearing walls
+
+MEP constraints (starter)
+
+pipe slope for drainage (e.g. 1–2% grade)
+
+minimum bend radius for conduit/duct
+
+clearance: avoid crossing beams/columns
+
+keep “service zones” (plumbing walls, ceiling plenums)
+
+These become “compile-time validators” that mark issues in the editor.
+
+2.4 The killer UX for architecture
+
+You already have ortho underlays. For buildings, add:
+
+Plan view (top) = blueprint
+
+Elevation views (front/side)
+
+Section cut view (slice plane you can drag)
+
+System toggles: Envelope / Structure / Plumbing / Electrical / HVAC
+
+And your SVG overlay becomes:
+
+draw rectangle = room
+
+draw line = wall segment
+
+draw circle = column
+
+draw spline = duct/pipe route
+
+Each drawing produces nodes/edges in GraphTemplate or wall segments in SurfaceTemplate.
+
+3) What to implement next (highest leverage for “architecture + internals”)
+
+If you want the smallest next step that unlocks all architectural internals:
+
+Step A — Add “LatticeFill” operator for framing
+
+Given a wall segment polyline:
+
+emit studs at spacing (e.g. 16" / 0.4064m)
+
+emit plates and headers
+
+create openings (doors/windows) that auto-trim studs
+
+This is purely graph generation + constraints.
+
+Step B — Add “RouteSolver” for MEP (even simple)
+
+Start with a deterministic router:
+
+route along walls/ceilings grid
+
+avoid forbidden volumes (beams/columns)
+
+enforce slope for drains
+Output = graph edges (pipes/ducts/conduits)
+
+Even without optimization, this is insane value.
+
+
+
+
+
+Architecture Stack v1 — Templates + Schemas + “Small House with Full Internals” Preset
+
+This is the exact universal way to do architecture (envelope + structure + MEP) using the same engine rules you’re using for boats:
+
+Envelope = SurfaceTemplate (shells + openings)
+
+Structure = GraphTemplate (studs/joists/trusses/columns)
+
+MEP = GraphTemplate (pipes/ducts/conduit) + constraints (clearance, slope, bend radius)
+
+Materials = Layer stacks (thickness + meaning), not just textures
+
+Everything below is designed so you can:
+
+author via SVG plan/elevation
+
+compile deterministically into meshes + collision + metadata
+
+toggle layers in-editor
+
+generate internal framing + routing automatically
+
+still hand-edit with feature nodes where needed
+
+1) Canonical coordinate system (lock this globally)
+
+Use this across every domain:
+
++X = East / right on plan
+
++Z = North / up on plan
+
++Y = Up
+
+So plan view is XZ, elevations are XY or ZY.
+
+2) Shared schemas you’ll reuse everywhere
+2.1 Material stacks (walls/floors/roof as layered systems)
+export type MaterialLayer = {
+  id: string;
+  kind: "render"|"structural"|"thermal"|"acoustic"|"fire"|"service";
+  thicknessM: number;
+  phys?: { density?: number; stiffness?: number; conductivity?: number };
+  render?: { materialId: string; uvScale?: number };
+};
+
+export type MaterialStack = {
+  id: string;
+  layers: MaterialLayer[];
+};
+
+2.2 Zones (spaces that drive MEP + structure)
+export type Zone = {
+  id: string;
+  polygonXZ: [number,number][]; // closed loop in XZ
+  floorY: number;
+  height: number;
+  usage: "living"|"kitchen"|"bath"|"bed"|"garage"|"utility";
+  meta?: Record<string, any>;
+};
+
+2.3 Openings (doors/windows) are first-class
+export type Opening = {
+  id: string;
+  wallId: string;
+  at: { t: number };         // param along wall segment chain [0..1]
+  widthM: number;
+  heightM: number;
+  sillM?: number;            // for windows
+  kind: "door"|"window";
+  trim?: { jambM?: number; headM?: number };
+};
+
+3) Template v1 specs
+3.1 HouseTemplate v1 (Envelope)
+
+Purpose: generate walls, floor slab, roof surfaces, openings cutouts, and regions for materials.
+
+Inputs
+export type HouseSpec = {
+  id: string;
+  units: "meter";
+  origin: [number,number,number];
+
+  stories: Array<{
+    id: string;
+    floorY: number;
+    height: number;
+    footprintXZ: [number,number][];
+  }>;
+
+  walls: Array<{
+    id: string;
+    storyId: string;
+    polylineXZ: [number,number][];
+    thicknessM: number;
+    stackId: string; // MaterialStack
+  }>;
+
+  floors: Array<{
+    id: string;
+    storyId: string;
+    thicknessM: number;
+    stackId: string;
+  }>;
+
+  roof?: {
+    kind: "gable"|"hip"|"flat";
+    pitchDeg?: number;
+    overhangM?: number;
+    ridgeLineXZ?: [[number,number],[number,number]];
+    stackId: string;
+  };
+
+  openings: Opening[];
+  zones?: Zone[];
+};
+
+Outputs
+
+EnvelopeMeshes: wall shells, floor slabs, roof shells
+
+EnvelopeRegions: named regions (exterior siding, drywall face, sheathing face)
+
+AnchorFrames: corners, wall midpoints, opening corners (for later routing/snaps)
+
+How it generates geometry (simple + robust)
+
+Walls are extruded from polylines as thickened shells (not single planes)
+
+Openings are cut as parametric voids (no heavy booleans needed; do it during wall mesh build)
+
+Roof is generated as a parametric surface set (gable/hip) + thickness offset
+
+3.2 FrameTemplate v1 (Structure)
+
+Purpose: studs/plates/headers/joists/trusses/columns generated from the envelope + rules.
+
+Inputs
+export type FrameSpec = {
+  id: string;
+  storyId: string;
+
+  stud: {
+    spacingM: number;      // 0.4064 (16") default
+    size: [number,number]; // [thickness, depth] e.g. [0.038, 0.089] (2x4 actual)
+    stackId?: string;      // wood material
+  };
+
+  plates: {
+    countTop: number;      // 2
+    countBottom: number;   // 1
+    size: [number,number];
+  };
+
+  headers: {
+    overOpenings: boolean;
+    minBearingM: number;   // e.g. 0.05
+    sizeRule: "simpleSpanTable";
+  };
+
+  joists?: {
+    spacingM: number;      // 0.4064
+    size: [number,number]; // 2x8 etc
+    direction: "X"|"Z";    // primary span
+  };
+
+  trusses?: {
+    enabled: boolean;
+    kind: "fink"|"howe"|"kingpost";
+    spacingM: number;      // 0.6096 (24") typical
+    webAngleMinDeg: number;
+    chordSize: [number,number];
+    webSize: [number,number];
+  };
+
+  columns?: Array<{ posXZ:[number,number]; size:[number,number] }>;
+};
+
+Outputs (GraphSpec)
+
+Everything structural is emitted as a GraphSpec:
+
+studs = edges (swept rectangular or capsule proxies)
+
+plates = sweep along wall top/bottom
+
+headers/jacks/king studs = emitted around openings
+
+joists = array sweeps
+
+trusses = repeated planar graphs along the roof direction
+
+Why graph: it gives you:
+
+collision proxies for free (capsules/boxes per edge)
+
+easy LOD (drop webs, simplify studs)
+
+metadata (member IDs, sizes, loads later)
+
+3.3 MEPTemplate v1 (Plumbing + Electrical + HVAC)
+
+Purpose: produce routed networks as graphs, with constraints.
+
+Inputs
+export type MepSpec = {
+  id: string;
+  storyId: string;
+
+  serviceZones: Array<{
+    id: string;
+    kind: "plumbingWall"|"ceilingPlenum"|"mechanicalRoom";
+    volume: { min:[number,number,number]; max:[number,number,number] };
+  }>;
+
+  plumbing: {
+    supplyDiaM: number;     // 0.019 (3/4") trunk
+    branchDiaM: number;     // 0.013 (1/2")
+    drainDiaM: number;      // 0.075 (3")
+    ventDiaM: number;       // 0.05 (2")
+    minSlope: number;       // 0.02 (2%)
+    bendRadiusM: number;    // 0.10
+  };
+
+  electrical: {
+    conduitDiaM: number;    // 0.02
+    bendRadiusM: number;    // 0.08
+    circuitRules: "simpleResidential";
+  };
+
+  hvac: {
+    trunkSizeM: [number,number];    // rectangular duct
+    branchDiaM: number;             // round duct
+    bendRadiusM: number;
+    maxVelocityHint: number;
+  };
+
+  fixtures: Array<{
+    id: string;
+    kind: "sink"|"toilet"|"shower"|"washer"|"waterHeater"|"furnace"|"outlet"|"switch"|"register";
+    zoneId?: string;
+    anchor: { space:"LOCAL"; pos:[number,number,number] } | { space:"SURFACE"; wallId:string; t:number; y:number };
+    meta?: Record<string, any>;
+  }>;
+};
+
+Outputs
+
+PlumbingGraphSpec
+
+ElectricalGraphSpec
+
+HvacGraphSpec
+
+MEPAnnotations: warnings for slope violations, clearance collisions, impossible bends
+
+Routing model (v1 deterministic, not fancy)
+
+Use a grid router in service zones first:
+
+for plumbing: prioritize plumbing walls + vertical chases
+
+for HVAC: prioritize ceiling plenums
+
+for electrical: along stud bays + ceiling paths
+
+Avoid “forbidden volumes”:
+
+beams, columns, and (optionally) studs/joists depending on realism level
+
+Enforce:
+
+drain slope: ΔY / ΔL ≥ minSlope
+
+bend radius: path curvature limits
+
+This can be upgraded later to optimized pathfinding, but v1 already works.
+
+4) Constraints pack v1 (the “this can’t be built” detector)
+
+Implement as compile-time validators that attach warnings to nodes/edges.
+
+Structural
+
+StudSpacingOK
+
+HeaderBearingOK(minBearingM)
+
+JoistSpanOK(spanTable)
+
+TrussWebAnglesOK(minDeg)
+
+MEP
+
+PipeSlopeOK(minSlope)
+
+BendRadiusOK(minRadius)
+
+ClearanceOK(minClearM, forbiddenVolumes)
+
+NoCrossingCriticalMembers (beams/columns)
+
+5) “Small House with Full Internals” — concrete preset
+
+This is a single preset bundle that compiles:
+
+envelope (walls/floor/roof)
+
+framing (studs/plates/joists + roof trusses)
+
+plumbing (supply + drain + vent)
+
+electrical (panel → outlets/switches)
+
+HVAC (furnace → trunk + branches)
+
+materials (layer stacks)
+
+5.1 Material stacks (minimal)
+
+File: assets/presets/architecture/materials/Stacks_v1.json
+
+{
+  "stacks": [
+    {
+      "id": "wall_2x4_exterior",
+      "layers": [
+        { "id":"siding",   "kind":"render",     "thicknessM":0.015, "render":{"materialId":"mat_siding"} },
+        { "id":"sheath",   "kind":"structural", "thicknessM":0.012, "render":{"materialId":"mat_osb"} },
+        { "id":"stud",     "kind":"structural", "thicknessM":0.089 },
+        { "id":"drywall",  "kind":"render",     "thicknessM":0.013, "render":{"materialId":"mat_drywall"} }
+      ]
+    },
+    {
+      "id": "floor_wood",
+      "layers": [
+        { "id":"subfloor", "kind":"structural", "thicknessM":0.018, "render":{"materialId":"mat_osb"} },
+        { "id":"finish",   "kind":"render",     "thicknessM":0.010, "render":{"materialId":"mat_woodfloor"} }
+      ]
+    },
+    {
+      "id": "roof_shingle",
+      "layers": [
+        { "id":"shingle",  "kind":"render",     "thicknessM":0.008, "render":{"materialId":"mat_shingle"} },
+        { "id":"roofdeck", "kind":"structural", "thicknessM":0.012, "render":{"materialId":"mat_osb"} }
+      ]
+    }
+  ]
+}
+
+5.2 House envelope
+
+File: assets/presets/architecture/SmallHouse_Envelope_v1.json
+
+{
+  "id": "SmallHouse_Envelope_v1",
+  "units": "meter",
+  "origin": [0,0,0],
+
+  "stories": [
+    {
+      "id": "story0",
+      "floorY": 0.0,
+      "height": 2.6,
+      "footprintXZ": [[0,0],[10,0],[10,7],[0,7]]
+    }
+  ],
+
+  "walls": [
+    {
+      "id": "wall_perimeter",
+      "storyId": "story0",
+      "polylineXZ": [[0,0],[10,0],[10,7],[0,7],[0,0]],
+      "thicknessM": 0.14,
+      "stackId": "wall_2x4_exterior"
+    }
+  ],
+
+  "floors": [
+    { "id": "floor0", "storyId":"story0", "thicknessM": 0.18, "stackId": "floor_wood" }
+  ],
+
+  "roof": {
+    "kind": "gable",
+    "pitchDeg": 26,
+    "overhangM": 0.35,
+    "ridgeLineXZ": [[2.0,3.5],[8.0,3.5]],
+    "stackId": "roof_shingle"
+  },
+
+  "openings": [
+    { "id":"door_front", "wallId":"wall_perimeter", "at":{"t":0.12}, "widthM":0.90, "heightM":2.03, "kind":"door" },
+    { "id":"win_living", "wallId":"wall_perimeter", "at":{"t":0.30}, "widthM":1.50, "heightM":1.10, "sillM":0.90, "kind":"window" },
+    { "id":"win_bed",    "wallId":"wall_perimeter", "at":{"t":0.70}, "widthM":1.20, "heightM":1.00, "sillM":0.95, "kind":"window" }
+  ],
+
+  "zones": [
+    { "id":"living", "polygonXZ":[[0.3,0.3],[6.5,0.3],[6.5,3.5],[0.3,3.5]], "floorY":0.0, "height":2.6, "usage":"living" },
+    { "id":"kitchen","polygonXZ":[[6.5,0.3],[9.7,0.3],[9.7,3.5],[6.5,3.5]], "floorY":0.0, "height":2.6, "usage":"kitchen" },
+    { "id":"bath",   "polygonXZ":[[6.5,3.5],[9.7,3.5],[9.7,5.5],[6.5,5.5]], "floorY":0.0, "height":2.6, "usage":"bath" },
+    { "id":"bed",    "polygonXZ":[[0.3,3.5],[6.5,3.5],[6.5,6.7],[0.3,6.7]], "floorY":0.0, "height":2.6, "usage":"bed" }
+  ]
+}
+
+5.3 Framing spec (studs/plates/joists/trusses)
+
+File: assets/presets/architecture/SmallHouse_Frame_v1.json
+
+{
+  "id": "SmallHouse_Frame_v1",
+  "storyId": "story0",
+
+  "stud": { "spacingM": 0.4064, "size": [0.038, 0.089], "stackId": "wood_framing" },
+  "plates": { "countTop": 2, "countBottom": 1, "size": [0.038, 0.089] },
+
+  "headers": { "overOpenings": true, "minBearingM": 0.05, "sizeRule": "simpleSpanTable" },
+
+  "joists": { "spacingM": 0.4064, "size": [0.038, 0.184], "direction": "X" },
+
+  "trusses": {
+    "enabled": true,
+    "kind": "fink",
+    "spacingM": 0.6096,
+    "webAngleMinDeg": 18,
+    "chordSize": [0.038, 0.140],
+    "webSize": [0.038, 0.089]
+  },
+
+  "columns": [
+    { "posXZ":[5.0, 3.5], "size":[0.14,0.14] }
+  ]
+}
+
+5.4 MEP spec (fixtures + service zones + routing rules)
+
+File: assets/presets/architecture/SmallHouse_MEP_v1.json
+
+{
+  "id": "SmallHouse_MEP_v1",
+  "storyId": "story0",
+
+  "serviceZones": [
+    {
+      "id":"plumbing_wall_bath",
+      "kind":"plumbingWall",
+      "volume": { "min":[6.5,0.0,3.4], "max":[9.7,2.6,3.7] }
+    },
+    {
+      "id":"ceiling_plenum",
+      "kind":"ceilingPlenum",
+      "volume": { "min":[0.0,2.25,0.0], "max":[10.0,2.6,7.0] }
+    },
+    {
+      "id":"mech_corner",
+      "kind":"mechanicalRoom",
+      "volume": { "min":[9.0,0.0,0.0], "max":[10.0,2.6,1.2] }
+    }
+  ],
+
+  "plumbing": { "supplyDiaM":0.019, "branchDiaM":0.013, "drainDiaM":0.075, "ventDiaM":0.05, "minSlope":0.02, "bendRadiusM":0.10 },
+  "electrical": { "conduitDiaM":0.020, "bendRadiusM":0.08, "circuitRules":"simpleResidential" },
+  "hvac": { "trunkSizeM":[0.25,0.15], "branchDiaM":0.10, "bendRadiusM":0.18, "maxVelocityHint":6.0 },
+
+  "fixtures": [
+    { "id":"water_heater", "kind":"waterHeater", "anchor":{"space":"LOCAL","pos":[9.5,0.0,0.6]} },
+    { "id":"furnace",      "kind":"furnace",     "anchor":{"space":"LOCAL","pos":[9.5,0.0,0.9]} },
+
+    { "id":"sink_kitchen", "kind":"sink",   "zoneId":"kitchen", "anchor":{"space":"LOCAL","pos":[9.2,0.9,1.2]} },
+    { "id":"toilet_bath",  "kind":"toilet", "zoneId":"bath",    "anchor":{"space":"LOCAL","pos":[8.9,0.0,4.7]} },
+    { "id":"shower_bath",  "kind":"shower", "zoneId":"bath",    "anchor":{"space":"LOCAL","pos":[6.9,0.0,5.2]} },
+
+    { "id":"panel",  "kind":"outlet", "anchor":{"space":"LOCAL","pos":[9.7,1.3,0.3]}, "meta":{"role":"panel"} },
+    { "id":"out_liv1","kind":"outlet","zoneId":"living","anchor":{"space":"SURFACE","wallId":"wall_perimeter","t":0.20,"y":0.35} },
+    { "id":"out_liv2","kind":"outlet","zoneId":"living","anchor":{"space":"SURFACE","wallId":"wall_perimeter","t":0.28,"y":0.35} },
+    { "id":"sw_front","kind":"switch","zoneId":"living","anchor":{"space":"SURFACE","wallId":"wall_perimeter","t":0.115,"y":1.1} },
+
+    { "id":"reg_liv", "kind":"register","zoneId":"living","anchor":{"space":"LOCAL","pos":[3.0,2.45,1.5]} },
+    { "id":"reg_bed", "kind":"register","zoneId":"bed",   "anchor":{"space":"LOCAL","pos":[3.0,2.45,5.8]} },
+    { "id":"reg_kit", "kind":"register","zoneId":"kitchen","anchor":{"space":"LOCAL","pos":[8.5,2.45,1.5]} }
+  ]
+}
+
+6) How compilation should split into bundles (clean toggles)
+
+Your compiler should emit one AssetBundle with layer manifests:
+
+bundle/envelope/*.glb
+
+bundle/structure/*.glb
+
+bundle/mep/plumbing.glb
+
+bundle/mep/electrical.glb
+
+bundle/mep/hvac.glb
+
+bundle/collision/*.json
+
+bundle/metadata/*.json
+
+bundle/diagnostics/*.json
+
+Then your editor toggles are just enabling groups.
+
+7) The 3 “domain operators” you implement to make this insane
+7.1 FrameWallOperator
+
+Input: wall polyline + openings + stud spacing
+Output: studs + plates + headers + jacks/king studs
+
+Core rules:
+
+studs at spacing, snapped away from openings
+
+around each opening:
+
+add king studs
+
+add jack studs
+
+add header above
+
+add sill under windows
+
+plates sweep along top/bottom edges
+
+7.2 FloorJoistOperator
+
+Input: footprint + joist direction + spacing
+Output: joist edges + rim joists + beams if span exceeds threshold
+
+7.3 MEPRouterOperator
+
+Input: fixtures + service zones + forbidden volumes + constraints
+Output: three graphs:
+
+plumbing: supply trunk → branches, drain with slope → stack, vent
+
+electrical: panel → outlets/switches
+
+HVAC: furnace → trunk → branch → registers
+
+V1 can be grid-based + deterministic; still massively useful.
+
+8) Editor UX (architecture mode)
+
+Add exactly these modes:
+
+Plan (XZ)
+
+Elevation (XY / ZY)
+
+Section (drag a cut plane)
+
+And these toggles:
+
+Envelope / Structure / Plumbing / Electrical / HVAC
+
+SVG tools mapping:
+
+draw polyline = wall
+
+draw rect = zone
+
+drop symbol = fixture/outlet/register
+
+draw route = “forced path hint” for MEP router (optional override)
