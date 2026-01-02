@@ -46,7 +46,7 @@ export function ParameterPanel({ params, onChange }: ParameterPanelProps) {
   };
 
   return (
-    <ScrollArea className="h-full">
+    <div className="h-full overflow-y-auto scrollbar-hide">
       <div className="p-4 space-y-6">
         {/* Dimensions */}
         <div>
@@ -233,6 +233,6 @@ export function ParameterPanel({ params, onChange }: ParameterPanelProps) {
           </div>
         </div>
       </div>
-    </ScrollArea>
+    </div>
   );
 }
