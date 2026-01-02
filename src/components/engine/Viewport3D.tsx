@@ -2,7 +2,9 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Grid, Environment, GizmoHelper, GizmoViewport, PerspectiveCamera } from "@react-three/drei";
 import { Suspense } from "react";
 import { HullMesh } from "./HullMesh";
+import { RiggingMesh } from "./RiggingMesh";
 import { HullParams } from "@/lib/parametric/types";
+import { LaserRiggingParams, DEFAULT_LASER_RIGGING } from "@/lib/parametric/laserRigging";
 
 interface Viewport3DProps {
   params: HullParams;
@@ -10,6 +12,10 @@ interface Viewport3DProps {
   showWireframe: boolean;
   showGrid: boolean;
   viewMode: "perspective" | "top" | "side" | "front";
+  showRigging?: boolean;
+  rigging?: LaserRiggingParams;
+  boomAngle?: number;
+  rudderAngle?: number;
 }
 
 export function Viewport3D({ 
@@ -17,22 +23,27 @@ export function Viewport3D({
   resolution, 
   showWireframe, 
   showGrid,
-  viewMode 
+  viewMode,
+  showRigging = true,
+  rigging = DEFAULT_LASER_RIGGING,
+  boomAngle = 0,
+  rudderAngle = 0
 }: Viewport3DProps) {
   const getCameraConfig = () => {
     switch (viewMode) {
       case "top":
-        return { position: [0, 5, 0] as [number, number, number], fov: 50 };
+        return { position: [0, 8, 0] as [number, number, number], fov: 50 };
       case "side":
-        return { position: [0, 0.5, 5] as [number, number, number], fov: 50 };
+        return { position: [0, 1.5, 8] as [number, number, number], fov: 50 };
       case "front":
-        return { position: [5, 0.5, 0] as [number, number, number], fov: 50 };
+        return { position: [8, 1.5, 0] as [number, number, number], fov: 50 };
       default:
-        return { position: [3, 2, 3] as [number, number, number], fov: 50 };
+        return { position: [5, 3, 5] as [number, number, number], fov: 50 };
     }
   };
 
   const camera = getCameraConfig();
+  const boomAngleRad = (boomAngle / 180) * Math.PI;
 
   return (
     <div style={{ width: '100%', height: '100%', minHeight: '500px' }} className="bg-[#0a0f1a] rounded-lg overflow-hidden border border-border">
@@ -40,9 +51,10 @@ export function Viewport3D({
         <PerspectiveCamera makeDefault position={camera.position} fov={camera.fov} />
         <Suspense fallback={null}>
           {/* Lighting */}
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[5, 5, 5]} intensity={1} castShadow />
-          <directionalLight position={[-5, 3, -5]} intensity={0.3} />
+          <ambientLight intensity={0.4} />
+          <directionalLight position={[5, 8, 5]} intensity={1.2} castShadow />
+          <directionalLight position={[-5, 3, -5]} intensity={0.4} />
+          <pointLight position={[0, 5, 0]} intensity={0.3} />
           
           {/* Environment */}
           <Environment preset="studio" />
@@ -50,14 +62,14 @@ export function Viewport3D({
           {/* Grid */}
           {showGrid && (
             <Grid
-              args={[10, 10]}
+              args={[20, 20]}
               cellSize={0.5}
               cellThickness={0.5}
               cellColor="#334155"
               sectionSize={1}
               sectionThickness={1}
               sectionColor="#475569"
-              fadeDistance={15}
+              fadeDistance={20}
               fadeStrength={1}
               infiniteGrid
             />
@@ -70,12 +82,22 @@ export function Viewport3D({
             showWireframe={showWireframe}
           />
           
+          {/* Rigging - Mast, Boom, Sail, Centerboard, Rudder */}
+          {showRigging && (
+            <RiggingMesh
+              rigging={rigging}
+              showWireframe={showWireframe}
+              boomAngle={boomAngleRad}
+              rudderAngle={rudderAngle}
+            />
+          )}
+          
           {/* Controls */}
           <OrbitControls
             enableDamping
             dampingFactor={0.05}
             minDistance={1}
-            maxDistance={20}
+            maxDistance={25}
           />
           
           {/* Gizmo */}

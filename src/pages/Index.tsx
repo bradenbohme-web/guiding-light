@@ -3,12 +3,14 @@ import { Viewport3D } from "@/components/engine/Viewport3D";
 import { ParameterPanel } from "@/components/engine/ParameterPanel";
 import { Toolbar } from "@/components/engine/Toolbar";
 import { CurvePanel } from "@/components/engine/CurveViewer";
-import { OrthoPanel } from "@/components/engine/OrthoView";
 import { RiggingPanel } from "@/components/engine/RiggingPanel";
+import { ReferencePack, ReferencePackState, DEFAULT_REFERENCE_PACK } from "@/components/engine/ReferencePack";
+import { InteractiveCurveEditor } from "@/components/engine/InteractiveCurveEditor";
+import { HeatmapGradientEditor, GradientStop, DEFAULT_GRADIENT_STOPS } from "@/components/engine/HeatmapGradientEditor";
 import { HullParams, DEFAULT_HULL_PARAMS } from "@/lib/parametric/types";
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING } from "@/lib/parametric/laserRigging";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cpu, Settings, TrendingUp, Sailboat, Grid2X2, Eye } from "lucide-react";
+import { Cpu, Settings, TrendingUp, Sailboat, Grid2X2, Image, Layers } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
@@ -18,17 +20,22 @@ const Index = () => {
   const [resolution, setResolution] = useState<"low" | "medium" | "high">("medium");
   const [showWireframe, setShowWireframe] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
+  const [showRigging, setShowRigging] = useState(true);
   const [viewMode, setViewMode] = useState<"perspective" | "top" | "side" | "front">("perspective");
   const [boomAngle, setBoomAngle] = useState(0);
   const [rudderAngle, setRudderAngle] = useState(0);
   const [showHeatmap, setShowHeatmap] = useState(false);
-  const [showCurveHandles, setShowCurveHandles] = useState(false);
+  const [referencePack, setReferencePack] = useState<ReferencePackState>(DEFAULT_REFERENCE_PACK);
+  const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
 
   const handleReset = () => {
     setParams({ ...DEFAULT_HULL_PARAMS });
     setRigging({ ...DEFAULT_LASER_RIGGING });
     setBoomAngle(0);
     setRudderAngle(0);
+    setShowRigging(true);
+    setReferencePack(DEFAULT_REFERENCE_PACK);
+    setGradientStops(DEFAULT_GRADIENT_STOPS);
   };
 
   const meshStats = useMemo(() => {
@@ -94,6 +101,10 @@ const Index = () => {
                 <Grid2X2 className="w-3.5 h-3.5" />
                 2D
               </TabsTrigger>
+              <TabsTrigger value="reference" className="gap-1.5 data-[state=active]:bg-secondary text-xs">
+                <Image className="w-3.5 h-3.5" />
+                Ref
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="params" className="flex-1 m-0 overflow-y-auto scrollbar-hide">
@@ -122,17 +133,49 @@ const Index = () => {
                     <Switch checked={showHeatmap} onCheckedChange={setShowHeatmap} />
                     <Label className="text-xs">Heatmap</Label>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Switch checked={showCurveHandles} onCheckedChange={setShowCurveHandles} />
-                    <Label className="text-xs">Handles</Label>
-                  </div>
                 </div>
-                <OrthoPanel 
-                  params={params} 
+                
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary" />
+                  Interactive Curve Editors
+                </h3>
+                
+                <InteractiveCurveEditor
+                  params={params}
+                  onParamsChange={setParams}
+                  viewType="top"
+                  width={360}
+                  height={220}
                   showHeatmap={showHeatmap}
-                  showCurveHandles={showCurveHandles}
                 />
+                
+                <InteractiveCurveEditor
+                  params={params}
+                  onParamsChange={setParams}
+                  viewType="side"
+                  width={360}
+                  height={180}
+                  showHeatmap={showHeatmap}
+                />
+                
+                {showHeatmap && (
+                  <div className="pt-2 border-t border-border">
+                    <HeatmapGradientEditor
+                      stops={gradientStops}
+                      onChange={setGradientStops}
+                      minDepth={0}
+                      maxDepth={params.height}
+                    />
+                  </div>
+                )}
               </div>
+            </TabsContent>
+            
+            <TabsContent value="reference" className="flex-1 m-0 p-4 overflow-y-auto scrollbar-hide">
+              <ReferencePack
+                state={referencePack}
+                onChange={setReferencePack}
+              />
             </TabsContent>
           </Tabs>
         </div>
@@ -145,13 +188,25 @@ const Index = () => {
             showWireframe={showWireframe}
             showGrid={showGrid}
             viewMode={viewMode}
+            showRigging={showRigging}
+            rigging={rigging}
+            boomAngle={boomAngle}
+            rudderAngle={rudderAngle}
           />
           
           {/* Viewport overlay info */}
           <div className="absolute bottom-4 left-4 text-xs font-mono text-muted-foreground bg-background/80 backdrop-blur px-3 py-2 rounded-lg border border-border">
-            <div>Length: {params.length.toFixed(2)}m</div>
-            <div>Beam: {params.beam.toFixed(2)}m</div>
-            <div>Height: {params.height.toFixed(2)}m</div>
+            <div>Length: {params.length.toFixed(2)}m | Beam: {params.beam.toFixed(2)}m | Height: {params.height.toFixed(2)}m</div>
+            <div className="flex items-center gap-3 mt-1">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <Switch 
+                  checked={showRigging} 
+                  onCheckedChange={setShowRigging}
+                  className="scale-75"
+                />
+                <span>Rigging</span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
