@@ -1,8 +1,10 @@
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Environment, GizmoHelper, GizmoViewport, PerspectiveCamera } from "@react-three/drei";
+import { OrbitControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera } from "@react-three/drei";
 import { Suspense } from "react";
 import { HullMesh } from "./HullMesh";
 import { RiggingMesh } from "./RiggingMesh";
+import { TransomCockpit } from "./TransomCockpit";
+import { OceanEnvironment } from "./OceanEnvironment";
 import { HullParams } from "@/lib/parametric/types";
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING } from "@/lib/parametric/laserRigging";
 
@@ -13,6 +15,7 @@ interface Viewport3DProps {
   showGrid: boolean;
   viewMode: "perspective" | "top" | "side" | "front";
   showRigging?: boolean;
+  showOcean?: boolean;
   rigging?: LaserRiggingParams;
   boomAngle?: number;
   rudderAngle?: number;
@@ -27,6 +30,7 @@ export function Viewport3D({
   showGrid,
   viewMode,
   showRigging = true,
+  showOcean = true,
   rigging = DEFAULT_LASER_RIGGING,
   boomAngle = 0,
   rudderAngle = 0,
@@ -54,17 +58,21 @@ export function Viewport3D({
       <Canvas shadows style={{ width: '100%', height: '100%' }}>
         <PerspectiveCamera makeDefault position={camera.position} fov={camera.fov} />
         <Suspense fallback={null}>
-          {/* Lighting */}
-          <ambientLight intensity={0.4} />
-          <directionalLight position={[5, 8, 5]} intensity={1.2} castShadow />
-          <directionalLight position={[-5, 3, -5]} intensity={0.4} />
-          <pointLight position={[0, 5, 0]} intensity={0.3} />
-          
-          {/* Environment */}
-          <Environment preset="studio" />
+          {/* Ocean Environment with volumetric lighting, caustics, birds */}
+          {showOcean ? (
+            <OceanEnvironment enabled={showOcean} sunPosition={[100, 50, 50]} />
+          ) : (
+            <>
+              {/* Fallback studio lighting when ocean is off */}
+              <ambientLight intensity={0.4} />
+              <directionalLight position={[5, 8, 5]} intensity={1.2} castShadow />
+              <directionalLight position={[-5, 3, -5]} intensity={0.4} />
+              <pointLight position={[0, 5, 0]} intensity={0.3} />
+            </>
+          )}
           
           {/* Grid */}
-          {showGrid && (
+          {showGrid && !showOcean && (
             <Grid
               args={[20, 20]}
               cellSize={0.5}
@@ -86,6 +94,12 @@ export function Viewport3D({
             showWireframe={showWireframe}
           />
           
+          {/* Transom and Cockpit */}
+          <TransomCockpit
+            params={params}
+            showWireframe={showWireframe}
+          />
+          
           {/* Rigging - Mast, Boom, Sail, Centerboard, Rudder */}
           {showRigging && (
             <RiggingMesh
@@ -103,7 +117,7 @@ export function Viewport3D({
             enableDamping
             dampingFactor={0.05}
             minDistance={1}
-            maxDistance={25}
+            maxDistance={showOcean ? 100 : 25}
           />
           
           {/* Gizmo */}

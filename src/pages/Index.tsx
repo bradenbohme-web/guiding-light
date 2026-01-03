@@ -10,7 +10,7 @@ import { HeatmapGradientEditor, GradientStop, DEFAULT_GRADIENT_STOPS } from "@/c
 import { HullParams, DEFAULT_HULL_PARAMS } from "@/lib/parametric/types";
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING } from "@/lib/parametric/laserRigging";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cpu, Settings, TrendingUp, Sailboat, Grid2X2, Image, Layers } from "lucide-react";
+import { Cpu, Settings, TrendingUp, Sailboat, Grid2X2, Image, Waves } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
@@ -21,6 +21,7 @@ const Index = () => {
   const [showWireframe, setShowWireframe] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
   const [showRigging, setShowRigging] = useState(true);
+  const [showOcean, setShowOcean] = useState(true);
   const [viewMode, setViewMode] = useState<"perspective" | "top" | "side" | "front">("perspective");
   const [boomAngle, setBoomAngle] = useState(0);
   const [rudderAngle, setRudderAngle] = useState(0);
@@ -38,6 +39,7 @@ const Index = () => {
     setWindAngle(0);
     setWindStrength(0.5);
     setShowRigging(true);
+    setShowOcean(true);
     setReferencePack(DEFAULT_REFERENCE_PACK);
     setGradientStops(DEFAULT_GRADIENT_STOPS);
   };
@@ -197,6 +199,7 @@ const Index = () => {
             showGrid={showGrid}
             viewMode={viewMode}
             showRigging={showRigging}
+            showOcean={showOcean}
             rigging={rigging}
             boomAngle={boomAngle}
             rudderAngle={rudderAngle}
@@ -215,6 +218,14 @@ const Index = () => {
                   className="scale-75"
                 />
                 <span>Rigging</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <Switch 
+                  checked={showOcean} 
+                  onCheckedChange={setShowOcean}
+                  className="scale-75"
+                />
+                <span>Ocean</span>
               </label>
             </div>
           </div>

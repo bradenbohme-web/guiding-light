@@ -90,7 +90,8 @@ export function RiggingPanel({
     boom: false,
     sail: false,
     centerboard: false,
-    rudder: false
+    rudder: false,
+    tiller: false
   });
 
   const toggleSection = (section: keyof typeof openSections) => {
@@ -314,7 +315,7 @@ export function RiggingPanel({
             value={rigging.sail.luffLength}
             min={3}
             max={7}
-            step={0.1}
+            step={0.01}
             unit="m"
             onChange={(v) => updateSail('luffLength', v)}
           />
@@ -323,7 +324,7 @@ export function RiggingPanel({
             value={rigging.sail.footLength}
             min={1.5}
             max={3.5}
-            step={0.1}
+            step={0.01}
             unit="m"
             onChange={(v) => updateSail('footLength', v)}
           />
@@ -332,20 +333,39 @@ export function RiggingPanel({
             value={rigging.sail.headWidth}
             min={0.05}
             max={0.5}
-            step={0.01}
+            step={0.005}
             unit="m"
             onChange={(v) => updateSail('headWidth', v)}
           />
           <ParamSlider
-            label="Leech Curve"
+            label="Leech Curve (Roach)"
             value={rigging.sail.leechCurve}
             min={0}
             max={0.15}
-            step={0.01}
+            step={0.005}
             onChange={(v) => updateSail('leechCurve', v)}
           />
+          <ParamSlider
+            label="Cunningham Effect"
+            value={rigging.sail.cunningham}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => updateSail('cunningham', v)}
+          />
+          <ParamSlider
+            label="Cloth Opacity"
+            value={rigging.sail.opacity}
+            min={0.5}
+            max={1}
+            step={0.01}
+            onChange={(v) => updateSail('opacity', v)}
+          />
+          
+          <Separator className="my-2" />
+          <Label className="text-xs font-medium">Battens</Label>
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Battens</Label>
+            <Label className="text-xs text-muted-foreground">Enabled</Label>
             <Switch 
               checked={rigging.sail.battens.enabled}
               onCheckedChange={(checked) => onChange({
@@ -357,8 +377,25 @@ export function RiggingPanel({
               })}
             />
           </div>
+          <ParamSlider
+            label="Batten Stiffness"
+            value={rigging.sail.battens.stiffness}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => onChange({
+              ...rigging,
+              sail: {
+                ...rigging.sail,
+                battens: { ...rigging.sail.battens, stiffness: v }
+              }
+            })}
+          />
+          
+          <Separator className="my-2" />
+          <Label className="text-xs font-medium">Vinyl Window</Label>
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Window</Label>
+            <Label className="text-xs text-muted-foreground">Enabled</Label>
             <Switch 
               checked={rigging.sail.window.enabled}
               onCheckedChange={(checked) => onChange({
@@ -370,6 +407,76 @@ export function RiggingPanel({
               })}
             />
           </div>
+          <ParamSlider
+            label="Window U Position"
+            value={rigging.sail.window.position.u}
+            min={0.2}
+            max={0.7}
+            step={0.01}
+            onChange={(v) => onChange({
+              ...rigging,
+              sail: {
+                ...rigging.sail,
+                window: { 
+                  ...rigging.sail.window, 
+                  position: { ...rigging.sail.window.position, u: v }
+                }
+              }
+            })}
+          />
+          <ParamSlider
+            label="Window V Position"
+            value={rigging.sail.window.position.v}
+            min={0.2}
+            max={0.6}
+            step={0.01}
+            onChange={(v) => onChange({
+              ...rigging,
+              sail: {
+                ...rigging.sail,
+                window: { 
+                  ...rigging.sail.window, 
+                  position: { ...rigging.sail.window.position, v: v }
+                }
+              }
+            })}
+          />
+          <ParamSlider
+            label="Window Width"
+            value={rigging.sail.window.size.width}
+            min={0.1}
+            max={0.6}
+            step={0.01}
+            unit="m"
+            onChange={(v) => onChange({
+              ...rigging,
+              sail: {
+                ...rigging.sail,
+                window: { 
+                  ...rigging.sail.window, 
+                  size: { ...rigging.sail.window.size, width: v }
+                }
+              }
+            })}
+          />
+          <ParamSlider
+            label="Window Height"
+            value={rigging.sail.window.size.height}
+            min={0.1}
+            max={0.7}
+            step={0.01}
+            unit="m"
+            onChange={(v) => onChange({
+              ...rigging,
+              sail: {
+                ...rigging.sail,
+                window: { 
+                  ...rigging.sail.window, 
+                  size: { ...rigging.sail.window.size, height: v }
+                }
+              }
+            })}
+          />
         </CollapsibleContent>
       </Collapsible>
 
@@ -406,9 +513,173 @@ export function RiggingPanel({
             value={rigging.centerboard.span}
             min={0.5}
             max={1.2}
-            step={0.05}
+            step={0.01}
             unit="m"
             onChange={(v) => updateCenterboard('span', v)}
+          />
+          <ParamSlider
+            label="Thickness"
+            value={rigging.centerboard.thickness}
+            min={0.01}
+            max={0.04}
+            step={0.001}
+            unit="m"
+            onChange={(v) => updateCenterboard('thickness', v)}
+          />
+          <ParamSlider
+            label="Tip Taper"
+            value={rigging.centerboard.tipChordScale}
+            min={0.3}
+            max={1}
+            step={0.01}
+            onChange={(v) => updateCenterboard('tipChordScale', v)}
+          />
+        </CollapsibleContent>
+      </Collapsible>
+
+      <Separator />
+
+      {/* Rudder */}
+      <Collapsible open={openSections.rudder}>
+        <SectionHeader 
+          icon={Navigation} 
+          title="Rudder Blade" 
+          open={openSections.rudder}
+          onToggle={() => toggleSection('rudder')}
+        />
+        <CollapsibleContent className="px-2 space-y-3 pt-2">
+          <ParamSlider
+            label="Chord"
+            value={rigging.rudder.blade.chord}
+            min={0.1}
+            max={0.35}
+            step={0.005}
+            unit="m"
+            onChange={(v) => onChange({
+              ...rigging,
+              rudder: {
+                ...rigging.rudder,
+                blade: { ...rigging.rudder.blade, chord: v }
+              }
+            })}
+          />
+          <ParamSlider
+            label="Span"
+            value={rigging.rudder.blade.span}
+            min={0.3}
+            max={0.9}
+            step={0.01}
+            unit="m"
+            onChange={(v) => onChange({
+              ...rigging,
+              rudder: {
+                ...rigging.rudder,
+                blade: { ...rigging.rudder.blade, span: v }
+              }
+            })}
+          />
+          <ParamSlider
+            label="Thickness"
+            value={rigging.rudder.blade.thickness}
+            min={0.008}
+            max={0.03}
+            step={0.001}
+            unit="m"
+            onChange={(v) => onChange({
+              ...rigging,
+              rudder: {
+                ...rigging.rudder,
+                blade: { ...rigging.rudder.blade, thickness: v }
+              }
+            })}
+          />
+          <ParamSlider
+            label="Tip Taper"
+            value={rigging.rudder.blade.tipChordScale}
+            min={0.4}
+            max={1}
+            step={0.01}
+            onChange={(v) => onChange({
+              ...rigging,
+              rudder: {
+                ...rigging.rudder,
+                blade: { ...rigging.rudder.blade, tipChordScale: v }
+              }
+            })}
+          />
+        </CollapsibleContent>
+      </Collapsible>
+
+      <Separator />
+
+      {/* Tiller */}
+      <Collapsible open={openSections.tiller}>
+        <SectionHeader 
+          icon={Anchor} 
+          title="Tiller & Extension" 
+          open={openSections.tiller}
+          onToggle={() => toggleSection('tiller')}
+        />
+        <CollapsibleContent className="px-2 space-y-3 pt-2">
+          <ParamSlider
+            label="Tiller Length"
+            value={rigging.rudder.tiller.length}
+            min={0.5}
+            max={1.2}
+            step={0.01}
+            unit="m"
+            onChange={(v) => onChange({
+              ...rigging,
+              rudder: {
+                ...rigging.rudder,
+                tiller: { ...rigging.rudder.tiller, length: v }
+              }
+            })}
+          />
+          <ParamSlider
+            label="Tiller Width"
+            value={rigging.rudder.tiller.width}
+            min={0.02}
+            max={0.08}
+            step={0.002}
+            unit="m"
+            onChange={(v) => onChange({
+              ...rigging,
+              rudder: {
+                ...rigging.rudder,
+                tiller: { ...rigging.rudder.tiller, width: v }
+              }
+            })}
+          />
+          <ParamSlider
+            label="Extension Length"
+            value={rigging.rudder.extension.length}
+            min={0.4}
+            max={1.2}
+            step={0.01}
+            unit="m"
+            onChange={(v) => onChange({
+              ...rigging,
+              rudder: {
+                ...rigging.rudder,
+                extension: { ...rigging.rudder.extension, length: v }
+              }
+            })}
+          />
+          <ParamSlider
+            label="Extension Hinge Angle"
+            value={rigging.rudder.extension.hingeAngle}
+            min={0}
+            max={90}
+            step={1}
+            unit="°"
+            onChange={(v) => onChange({
+              ...rigging,
+              rudder: {
+                ...rigging.rudder,
+                extension: { ...rigging.rudder.extension, hingeAngle: v }
+              }
+            })}
           />
         </CollapsibleContent>
       </Collapsible>
