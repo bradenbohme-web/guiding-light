@@ -16,6 +16,8 @@ interface Viewport3DProps {
   rigging?: LaserRiggingParams;
   boomAngle?: number;
   rudderAngle?: number;
+  windAngle?: number;
+  windStrength?: number;
 }
 
 export function Viewport3D({ 
@@ -27,7 +29,9 @@ export function Viewport3D({
   showRigging = true,
   rigging = DEFAULT_LASER_RIGGING,
   boomAngle = 0,
-  rudderAngle = 0
+  rudderAngle = 0,
+  windAngle = 0,
+  windStrength = 0.5
 }: Viewport3DProps) {
   const getCameraConfig = () => {
     switch (viewMode) {
@@ -89,6 +93,8 @@ export function Viewport3D({
               showWireframe={showWireframe}
               boomAngle={boomAngleRad}
               rudderAngle={rudderAngle}
+              windAngle={windAngle}
+              windStrength={windStrength}
             />
           )}
           

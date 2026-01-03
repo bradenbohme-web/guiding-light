@@ -15,6 +15,10 @@ interface RiggingPanelProps {
   onBoomAngleChange: (angle: number) => void;
   rudderAngle: number;
   onRudderAngleChange: (angle: number) => void;
+  windAngle: number;
+  onWindAngleChange: (angle: number) => void;
+  windStrength: number;
+  onWindStrengthChange: (strength: number) => void;
 }
 
 interface ParamSliderProps {
@@ -74,7 +78,11 @@ export function RiggingPanel({
   boomAngle,
   onBoomAngleChange,
   rudderAngle,
-  onRudderAngleChange
+  onRudderAngleChange,
+  windAngle,
+  onWindAngleChange,
+  windStrength,
+  onWindStrengthChange
 }: RiggingPanelProps) {
   const [openSections, setOpenSections] = useState({
     controls: true,
@@ -128,6 +136,24 @@ export function RiggingPanel({
           onToggle={() => toggleSection('controls')}
         />
         <CollapsibleContent className="px-2 space-y-3 pt-2">
+          <ParamSlider
+            label="Wind Angle"
+            value={(windAngle * 180) / Math.PI}
+            min={-180}
+            max={180}
+            step={5}
+            unit="°"
+            onChange={(v) => onWindAngleChange((v * Math.PI) / 180)}
+          />
+          <ParamSlider
+            label="Wind Strength"
+            value={windStrength}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={onWindStrengthChange}
+          />
+          <Separator className="my-2" />
           <ParamSlider
             label="Boom Angle"
             value={(boomAngle * 180) / Math.PI}

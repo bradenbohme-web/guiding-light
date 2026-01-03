@@ -24,6 +24,8 @@ const Index = () => {
   const [viewMode, setViewMode] = useState<"perspective" | "top" | "side" | "front">("perspective");
   const [boomAngle, setBoomAngle] = useState(0);
   const [rudderAngle, setRudderAngle] = useState(0);
+  const [windAngle, setWindAngle] = useState(0);
+  const [windStrength, setWindStrength] = useState(0.5);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [referencePack, setReferencePack] = useState<ReferencePackState>(DEFAULT_REFERENCE_PACK);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
@@ -33,6 +35,8 @@ const Index = () => {
     setRigging({ ...DEFAULT_LASER_RIGGING });
     setBoomAngle(0);
     setRudderAngle(0);
+    setWindAngle(0);
+    setWindStrength(0.5);
     setShowRigging(true);
     setReferencePack(DEFAULT_REFERENCE_PACK);
     setGradientStops(DEFAULT_GRADIENT_STOPS);
@@ -119,6 +123,10 @@ const Index = () => {
                 onBoomAngleChange={setBoomAngle}
                 rudderAngle={rudderAngle}
                 onRudderAngleChange={setRudderAngle}
+                windAngle={windAngle}
+                onWindAngleChange={setWindAngle}
+                windStrength={windStrength}
+                onWindStrengthChange={setWindStrength}
               />
             </TabsContent>
             
@@ -192,6 +200,8 @@ const Index = () => {
             rigging={rigging}
             boomAngle={boomAngle}
             rudderAngle={rudderAngle}
+            windAngle={windAngle}
+            windStrength={windStrength}
           />
           
           {/* Viewport overlay info */}
