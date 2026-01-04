@@ -27,6 +27,8 @@ const Index = () => {
   const [rudderAngle, setRudderAngle] = useState(0);
   const [windAngle, setWindAngle] = useState(0);
   const [windStrength, setWindStrength] = useState(0.5);
+  const [boatSpeed, setBoatSpeed] = useState(0);
+  const [highlightTarget, setHighlightTarget] = useState<string | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [referencePack, setReferencePack] = useState<ReferencePackState>(DEFAULT_REFERENCE_PACK);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
@@ -38,6 +40,8 @@ const Index = () => {
     setRudderAngle(0);
     setWindAngle(0);
     setWindStrength(0.5);
+    setBoatSpeed(0);
+    setHighlightTarget(null);
     setShowRigging(true);
     setShowOcean(true);
     setReferencePack(DEFAULT_REFERENCE_PACK);
@@ -88,8 +92,8 @@ const Index = () => {
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Parameters */}
-        <div className="w-96 border-r border-border bg-card flex flex-col">
-          <Tabs defaultValue="params" className="flex-1 flex flex-col">
+          <div className="w-96 border-r border-border bg-card flex flex-col min-h-0">
+            <Tabs defaultValue="params" className="flex-1 flex flex-col min-h-0">
             <TabsList className="w-full justify-start rounded-none border-b border-border bg-transparent px-2">
               <TabsTrigger value="params" className="gap-1.5 data-[state=active]:bg-secondary text-xs">
                 <Settings className="w-3.5 h-3.5" />
@@ -113,11 +117,11 @@ const Index = () => {
               </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="params" className="flex-1 m-0 overflow-y-auto scrollbar-hide">
+            <TabsContent value="params" className="flex-1 min-h-0 m-0 overflow-y-auto scrollbar-hide">
               <ParameterPanel params={params} onChange={setParams} />
             </TabsContent>
             
-            <TabsContent value="rigging" className="flex-1 m-0 overflow-y-auto scrollbar-hide p-4">
+            <TabsContent value="rigging" className="flex-1 min-h-0 m-0 overflow-y-auto scrollbar-hide p-4">
               <RiggingPanel 
                 rigging={rigging}
                 onChange={setRigging}
@@ -129,14 +133,17 @@ const Index = () => {
                 onWindAngleChange={setWindAngle}
                 windStrength={windStrength}
                 onWindStrengthChange={setWindStrength}
+                boatSpeed={boatSpeed}
+                onBoatSpeedChange={setBoatSpeed}
+                onHoverTargetChange={setHighlightTarget}
               />
             </TabsContent>
             
-            <TabsContent value="curves" className="flex-1 m-0 p-4 overflow-y-auto scrollbar-hide">
+            <TabsContent value="curves" className="flex-1 min-h-0 m-0 p-4 overflow-y-auto scrollbar-hide">
               <CurvePanel params={params} />
             </TabsContent>
             
-            <TabsContent value="ortho" className="flex-1 m-0 p-4 overflow-y-auto scrollbar-hide">
+            <TabsContent value="ortho" className="flex-1 min-h-0 m-0 p-4 overflow-y-auto scrollbar-hide">
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
@@ -181,7 +188,7 @@ const Index = () => {
               </div>
             </TabsContent>
             
-            <TabsContent value="reference" className="flex-1 m-0 p-4 overflow-y-auto scrollbar-hide">
+            <TabsContent value="reference" className="flex-1 min-h-0 m-0 p-4 overflow-y-auto scrollbar-hide">
               <ReferencePack
                 state={referencePack}
                 onChange={setReferencePack}
@@ -205,6 +212,8 @@ const Index = () => {
             rudderAngle={rudderAngle}
             windAngle={windAngle}
             windStrength={windStrength}
+            boatSpeed={boatSpeed}
+            highlightTarget={highlightTarget}
           />
           
           {/* Viewport overlay info */}

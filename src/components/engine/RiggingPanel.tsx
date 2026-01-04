@@ -19,6 +19,9 @@ interface RiggingPanelProps {
   onWindAngleChange: (angle: number) => void;
   windStrength: number;
   onWindStrengthChange: (strength: number) => void;
+  boatSpeed: number;
+  onBoatSpeedChange: (speed: number) => void;
+  onHoverTargetChange?: (target: string | null) => void;
 }
 
 interface ParamSliderProps {
@@ -29,11 +32,17 @@ interface ParamSliderProps {
   step: number;
   unit?: string;
   onChange: (value: number) => void;
+  hoverTarget?: string;
+  onHoverTargetChange?: (target: string | null) => void;
 }
 
-function ParamSlider({ label, value, min, max, step, unit, onChange }: ParamSliderProps) {
+function ParamSlider({ label, value, min, max, step, unit, onChange, hoverTarget, onHoverTargetChange }: ParamSliderProps) {
   return (
-    <div className="space-y-1.5">
+    <div
+      className="space-y-1.5"
+      onMouseEnter={() => onHoverTargetChange?.(hoverTarget ?? null)}
+      onMouseLeave={() => onHoverTargetChange?.(null)}
+    >
       <div className="flex justify-between items-center">
         <Label className="text-xs text-muted-foreground">{label}</Label>
         <span className="text-xs font-mono text-primary">
@@ -82,7 +91,10 @@ export function RiggingPanel({
   windAngle,
   onWindAngleChange,
   windStrength,
-  onWindStrengthChange
+  onWindStrengthChange,
+  boatSpeed,
+  onBoatSpeedChange,
+  onHoverTargetChange,
 }: RiggingPanelProps) {
   const [openSections, setOpenSections] = useState({
     controls: true,
@@ -144,6 +156,8 @@ export function RiggingPanel({
             max={180}
             step={5}
             unit="°"
+            hoverTarget="sail"
+            onHoverTargetChange={onHoverTargetChange}
             onChange={(v) => onWindAngleChange((v * Math.PI) / 180)}
           />
           <ParamSlider
@@ -152,7 +166,32 @@ export function RiggingPanel({
             min={0}
             max={1}
             step={0.05}
+            hoverTarget="sail"
+            onHoverTargetChange={onHoverTargetChange}
             onChange={onWindStrengthChange}
+          />
+          <ParamSlider
+            label="Boat Speed"
+            value={boatSpeed}
+            min={0}
+            max={8}
+            step={0.1}
+            unit="m/s"
+            hoverTarget="hull"
+            onHoverTargetChange={onHoverTargetChange}
+            onChange={onBoatSpeedChange}
+          />
+          <Separator className="my-2" />
+          <ParamSlider
+            label="Traveler Car"
+            value={rigging.traveler.carZ}
+            min={-rigging.traveler.trackHalfSpan}
+            max={rigging.traveler.trackHalfSpan}
+            step={0.01}
+            unit="m"
+            hoverTarget="traveler"
+            onHoverTargetChange={onHoverTargetChange}
+            onChange={(v) => onChange({ ...rigging, traveler: { ...rigging.traveler, carZ: v } })}
           />
           <Separator className="my-2" />
           <ParamSlider
@@ -162,6 +201,8 @@ export function RiggingPanel({
             max={90}
             step={1}
             unit="°"
+            hoverTarget="boom"
+            onHoverTargetChange={onHoverTargetChange}
             onChange={(v) => onBoomAngleChange((v * Math.PI) / 180)}
           />
           <ParamSlider
@@ -171,6 +212,8 @@ export function RiggingPanel({
             max={35}
             step={1}
             unit="°"
+            hoverTarget="rudder"
+            onHoverTargetChange={onHoverTargetChange}
             onChange={onRudderAngleChange}
           />
           <ParamSlider
@@ -179,6 +222,8 @@ export function RiggingPanel({
             min={0}
             max={1}
             step={0.01}
+            hoverTarget="sail"
+            onHoverTargetChange={onHoverTargetChange}
             onChange={(v) => onChange({ ...rigging, vangTension: v })}
           />
           <ParamSlider
@@ -187,6 +232,8 @@ export function RiggingPanel({
             min={0}
             max={1}
             step={0.01}
+            hoverTarget="sail"
+            onHoverTargetChange={onHoverTargetChange}
             onChange={(v) => onChange({ ...rigging, cunninghamTension: v })}
           />
           <ParamSlider
@@ -195,6 +242,8 @@ export function RiggingPanel({
             min={0}
             max={1}
             step={0.01}
+            hoverTarget="sail"
+            onHoverTargetChange={onHoverTargetChange}
             onChange={(v) => onChange({ ...rigging, outhaulTension: v })}
           />
           <ParamSlider
@@ -203,6 +252,8 @@ export function RiggingPanel({
             min={0}
             max={1}
             step={0.01}
+            hoverTarget="ropes"
+            onHoverTargetChange={onHoverTargetChange}
             onChange={(v) => onChange({ ...rigging, mainsheetTension: v })}
           />
         </CollapsibleContent>

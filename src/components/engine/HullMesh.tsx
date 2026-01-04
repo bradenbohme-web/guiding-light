@@ -52,7 +52,7 @@ export function HullMesh({ params, resolution, showWireframe }: HullMeshProps) {
       {/* Hull surface */}
       <mesh ref={hullRef} geometry={hullGeometry}>
         <meshStandardMaterial
-          color="#1e88e5"
+          color="hsl(199 89% 48%)"
           metalness={0.3}
           roughness={0.6}
           side={THREE.DoubleSide}
@@ -62,7 +62,7 @@ export function HullMesh({ params, resolution, showWireframe }: HullMeshProps) {
       {/* Deck surface */}
       <mesh ref={deckRef} geometry={deckGeometry}>
         <meshStandardMaterial
-          color="#e0e0e0"
+          color="hsl(0 0% 88%)"
           metalness={0.1}
           roughness={0.8}
           side={THREE.DoubleSide}

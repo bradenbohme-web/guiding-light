@@ -21,6 +21,8 @@ interface Viewport3DProps {
   rudderAngle?: number;
   windAngle?: number;
   windStrength?: number;
+  boatSpeed?: number;
+  highlightTarget?: string | null;
 }
 
 export function Viewport3D({ 
@@ -35,7 +37,9 @@ export function Viewport3D({
   boomAngle = 0,
   rudderAngle = 0,
   windAngle = 0,
-  windStrength = 0.5
+  windStrength = 0.5,
+  boatSpeed = 0,
+  highlightTarget = null
 }: Viewport3DProps) {
   const getCameraConfig = () => {
     switch (viewMode) {
