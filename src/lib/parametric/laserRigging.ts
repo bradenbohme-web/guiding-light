@@ -138,6 +138,14 @@ export interface RopeParams {
   elasticity: number;       // Stretch factor
 }
 
+// ===== TRAVELER SYSTEM =====
+export interface TravelerParams {
+  x: number;               // Track center X in hull space
+  y: number;               // Track height above deck
+  trackHalfSpan: number;   // Half-width port/stbd
+  carZ: number;            // Current car Z position along track (meters)
+}
+
 // ===== COMPLETE RIGGING PARAMETERS =====
 export interface LaserRiggingParams {
   mast: MastParams;
@@ -148,7 +156,9 @@ export interface LaserRiggingParams {
   pulleys: PulleyParams[];
   ropes: RopeParams[];
   hardpoints: Hardpoint[];
-  
+
+  traveler: TravelerParams;
+
   // Tuning state
   vangTension: number;      // Boom angle control: 0..1
   cunninghamTension: number;// Luff tension: 0..1
@@ -191,6 +201,7 @@ export const DEFAULT_LASER_HARDPOINTS: Hardpoint[] = [
 // ===== DEFAULT LASER PULLEYS =====
 export const DEFAULT_LASER_PULLEYS: PulleyParams[] = [
   { id: "mainsheet_boom", position: new THREE.Vector3(-1.8, -0.03, 0.0), attach: "boom", type: "double", radius: 0.02, color: "#1a1a1a" },
+  // NOTE: traveler pulley Z gets overridden at runtime from rigging.traveler.carZ
   { id: "mainsheet_traveler", position: new THREE.Vector3(-0.33, 0.09, 0.0), attach: "hull", type: "single", radius: 0.02, color: "#1a1a1a" },
   { id: "vang_boom_block", position: new THREE.Vector3(-0.5, -0.03, 0.0), attach: "boom", type: "double", radius: 0.015, color: "#1a1a1a" },
   { id: "vang_base_block", position: new THREE.Vector3(0.04, 0.06, 0.0), attach: "hull", type: "double", radius: 0.015, color: "#1a1a1a" },
@@ -332,6 +343,14 @@ export const DEFAULT_LASER_RIGGING: LaserRiggingParams = {
   pulleys: DEFAULT_LASER_PULLEYS,
   ropes: DEFAULT_LASER_ROPES,
   hardpoints: DEFAULT_LASER_HARDPOINTS,
+
+  traveler: {
+    x: -0.33,
+    y: 0.09,
+    trackHalfSpan: 0.35,
+    carZ: 0,
+  },
+
   vangTension: 0.4,
   cunninghamTension: 0.3,
   outhaulTension: 0.5,
