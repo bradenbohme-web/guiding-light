@@ -1,9 +1,10 @@
-// 3D Laser Rigging Components - Mast, Boom, Centerboard, Rudder, Pulleys
+// 3D Laser Rigging Components - Mast, Boom, Centerboard, Rudder, Pulleys, Traveler
 import { useMemo } from "react";
 import * as THREE from "three";
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING } from "@/lib/parametric/laserRigging";
 import { ClothSail } from "./ClothSail";
 import { RopeLines } from "./RopeLines";
+import { TravelerSystem } from "./TravelerSystem";
 
 interface RiggingMeshProps {
   rigging: LaserRiggingParams;
@@ -12,17 +13,18 @@ interface RiggingMeshProps {
   rudderAngle?: number;
   windAngle?: number;
   windStrength?: number;
+  highlightTarget?: string | null;
 }
 
 // Mast Component with tapered cylinder and pre-bend
-function MastMesh({ rigging, showWireframe }: { rigging: LaserRiggingParams; showWireframe: boolean }) {
+function MastMesh({ rigging, showWireframe, highlight }: { rigging: LaserRiggingParams; showWireframe: boolean; highlight: boolean }) {
   const geometry = useMemo(() => {
     const { height, baseRadius, tipRadius, bend } = rigging.mast;
     const segments = 32;
     const heightSegments = 24;
-    
+
     const geo = new THREE.CylinderGeometry(tipRadius, baseRadius, height, segments, heightSegments);
-    
+
     // Apply pre-bend
     const posAttr = geo.getAttribute('position') as THREE.BufferAttribute;
     for (let i = 0; i < posAttr.count; i++) {
@@ -33,34 +35,40 @@ function MastMesh({ rigging, showWireframe }: { rigging: LaserRiggingParams; sho
     }
     posAttr.needsUpdate = true;
     geo.computeVertexNormals();
-    
+
     return geo;
   }, [rigging.mast]);
 
+  const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
+
   return (
-    <mesh 
+    <mesh
       geometry={geometry}
       position={[rigging.mast.position.x, rigging.mast.height / 2 + 0.12, rigging.mast.position.z]}
     >
-      <meshStandardMaterial 
+      <meshStandardMaterial
         color={rigging.mast.color}
         roughness={0.3}
         metalness={0.7}
         wireframe={showWireframe}
+        emissive={emissive}
+        emissiveIntensity={highlight ? 0.5 : 0}
       />
     </mesh>
   );
 }
 
 // Boom Component
-function BoomMesh({ 
-  rigging, 
-  showWireframe, 
-  angle = 0 
-}: { 
-  rigging: LaserRiggingParams; 
+function BoomMesh({
+  rigging,
+  showWireframe,
+  angle = 0,
+  highlight
+}: {
+  rigging: LaserRiggingParams;
   showWireframe: boolean;
   angle: number;
+  highlight: boolean;
 }) {
   const geometry = useMemo(() => {
     const { length, radius } = rigging.boom;
@@ -68,31 +76,34 @@ function BoomMesh({
   }, [rigging.boom]);
 
   const gooseneckY = rigging.boom.gooseneckHeight;
-  
+  const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
+
   return (
-    <group 
+    <group
       position={[rigging.mast.position.x, gooseneckY, 0]}
       rotation={[0, angle, 0]}
     >
-      <mesh 
+      <mesh
         geometry={geometry}
         position={[-rigging.boom.length / 2, 0, 0]}
         rotation={[0, 0, Math.PI / 2]}
       >
-        <meshStandardMaterial 
+        <meshStandardMaterial
           color={rigging.boom.color}
           roughness={0.3}
           metalness={0.7}
           wireframe={showWireframe}
+          emissive={emissive}
+          emissiveIntensity={highlight ? 0.5 : 0}
         />
       </mesh>
-      
+
       {/* Gooseneck fitting */}
       <mesh position={[0, 0, 0]}>
         <sphereGeometry args={[0.025, 12, 8]} />
         <meshStandardMaterial color="#333" roughness={0.4} metalness={0.6} />
       </mesh>
-      
+
       {/* Boom end cap */}
       <mesh position={[-rigging.boom.length, 0, 0]}>
         <sphereGeometry args={[rigging.boom.radius, 12, 8]} />
@@ -103,24 +114,25 @@ function BoomMesh({
 }
 
 // Centerboard (NACA foil approximation)
-function CenterboardMesh({ 
-  rigging, 
-  showWireframe 
-}: { 
-  rigging: LaserRiggingParams; 
+function CenterboardMesh({
+  rigging,
+  showWireframe,
+  highlight
+}: {
+  rigging: LaserRiggingParams;
   showWireframe: boolean;
+  highlight: boolean;
 }) {
   const geometry = useMemo(() => {
-    const { chord, span, thickness, tipChordScale } = rigging.centerboard;
-    
+    const { chord, span, thickness } = rigging.centerboard;
+
     // Create NACA-like foil cross-section
     const shape = new THREE.Shape();
     const steps = 20;
-    
+
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const x = chord * (1 - t) - chord / 2;
-      // NACA 0012 approximation
       const y = thickness * 5 * (0.2969 * Math.sqrt(t) - 0.1260 * t - 0.3516 * t * t + 0.2843 * t * t * t - 0.1015 * t * t * t * t);
       if (i === 0) shape.moveTo(x, y);
       else shape.lineTo(x, y);
@@ -131,32 +143,35 @@ function CenterboardMesh({
       const y = -thickness * 5 * (0.2969 * Math.sqrt(t) - 0.1260 * t - 0.3516 * t * t + 0.2843 * t * t * t - 0.1015 * t * t * t * t);
       shape.lineTo(x, y);
     }
-    
+
     const extrudeSettings = {
       steps: 1,
       depth: span,
       bevelEnabled: false
     };
-    
+
     return new THREE.ExtrudeGeometry(shape, extrudeSettings);
   }, [rigging.centerboard]);
 
   const deployedOffset = -rigging.centerboard.span * rigging.centerboard.deployment;
+  const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
 
   return (
     <group position={[rigging.centerboard.position.x, deployedOffset - 0.05, 0]}>
-      <mesh 
+      <mesh
         geometry={geometry}
         rotation={[Math.PI / 2, 0, 0]}
       >
-        <meshStandardMaterial 
+        <meshStandardMaterial
           color={rigging.centerboard.color}
           roughness={0.6}
           metalness={0.15}
           wireframe={showWireframe}
+          emissive={emissive}
+          emissiveIntensity={highlight ? 0.4 : 0}
         />
       </mesh>
-      
+
       {/* Centerboard handle */}
       <mesh position={[0, 0.05, 0]}>
         <boxGeometry args={[0.15, 0.02, 0.04]} />
@@ -167,22 +182,23 @@ function CenterboardMesh({
 }
 
 // Rudder System with blade, tiller, and extension
-function RudderMesh({ 
-  rigging, 
-  showWireframe, 
-  angle = 0 
-}: { 
-  rigging: LaserRiggingParams; 
+function RudderMesh({
+  rigging,
+  showWireframe,
+  angle = 0,
+  highlight
+}: {
+  rigging: LaserRiggingParams;
   showWireframe: boolean;
   angle: number;
+  highlight: boolean;
 }) {
   const bladeGeometry = useMemo(() => {
     const { chord, span, thickness } = rigging.rudder.blade;
-    
-    // Create foil shape
+
     const shape = new THREE.Shape();
     const steps = 16;
-    
+
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const x = chord * (1 - t) - chord / 2;
@@ -196,7 +212,7 @@ function RudderMesh({
       const y = -thickness * 4 * (0.2969 * Math.sqrt(t) - 0.1260 * t - 0.3516 * t * t + 0.2843 * t * t * t - 0.1015 * t * t * t * t);
       shape.lineTo(x, y);
     }
-    
+
     const extrudeSettings = { steps: 1, depth: span, bevelEnabled: false };
     return new THREE.ExtrudeGeometry(shape, extrudeSettings);
   }, [rigging.rudder.blade]);
@@ -212,34 +228,37 @@ function RudderMesh({
   }, [rigging.rudder.extension]);
 
   const rudderAngleRad = (angle / 180) * Math.PI;
+  const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
 
   return (
-    <group 
+    <group
       position={[rigging.rudder.blade.position.x, rigging.rudder.blade.position.y, 0]}
       rotation={[0, rudderAngleRad, 0]}
     >
       {/* Rudder blade */}
-      <mesh 
+      <mesh
         geometry={bladeGeometry}
         position={[0, -rigging.rudder.blade.span / 2, 0]}
         rotation={[Math.PI / 2, 0, 0]}
       >
-        <meshStandardMaterial 
+        <meshStandardMaterial
           color={rigging.rudder.blade.color}
           roughness={0.6}
           metalness={0.15}
           wireframe={showWireframe}
+          emissive={emissive}
+          emissiveIntensity={highlight ? 0.4 : 0}
         />
       </mesh>
-      
+
       {/* Rudder head/cheeks */}
       <mesh position={[0, 0.05, 0]}>
         <boxGeometry args={[0.08, 0.1, 0.04]} />
         <meshStandardMaterial color="#333" roughness={0.5} metalness={0.3} />
       </mesh>
-      
+
       {/* Tiller */}
-      <mesh 
+      <mesh
         geometry={tillerGeometry}
         position={[
           rigging.rudder.tiller.offset.x + rigging.rudder.tiller.length / 2,
@@ -247,16 +266,16 @@ function RudderMesh({
           0
         ]}
       >
-        <meshStandardMaterial 
+        <meshStandardMaterial
           color={rigging.rudder.tiller.color}
           roughness={0.7}
           metalness={0.05}
           wireframe={showWireframe}
         />
       </mesh>
-      
+
       {/* Tiller extension hinge */}
-      <group 
+      <group
         position={[
           rigging.rudder.tiller.offset.x + rigging.rudder.tiller.length,
           rigging.rudder.tiller.offset.y,
@@ -268,22 +287,22 @@ function RudderMesh({
           <cylinderGeometry args={[0.015, 0.015, 0.03, 8]} />
           <meshStandardMaterial color="#333" roughness={0.4} metalness={0.5} />
         </mesh>
-        
+
         {/* Extension */}
         <group rotation={[0, (rigging.rudder.extension.hingeAngle / 180) * Math.PI, 0]}>
-          <mesh 
+          <mesh
             geometry={extensionGeometry}
             position={[rigging.rudder.extension.length / 2, 0, 0]}
             rotation={[0, 0, Math.PI / 2]}
           >
-            <meshStandardMaterial 
+            <meshStandardMaterial
               color={rigging.rudder.extension.color}
               roughness={0.5}
               metalness={0.2}
               wireframe={showWireframe}
             />
           </mesh>
-          
+
           {/* Extension grip */}
           <mesh position={[rigging.rudder.extension.length, 0, 0]}>
             <sphereGeometry args={[0.018, 8, 6]} />
@@ -296,13 +315,13 @@ function RudderMesh({
 }
 
 // Pulley/Block visualization with sheave
-function PulleyMesh({ 
-  pulley, 
+function PulleyMesh({
+  pulley,
   showWireframe,
   boomAngle,
   rigging
-}: { 
-  pulley: LaserRiggingParams['pulleys'][0]; 
+}: {
+  pulley: LaserRiggingParams['pulleys'][0];
   showWireframe: boolean;
   boomAngle: number;
   rigging: LaserRiggingParams;
@@ -310,7 +329,7 @@ function PulleyMesh({
   // Transform position based on attachment
   const position = useMemo(() => {
     const pos = pulley.position.clone();
-    
+
     if (pulley.attach === "boom") {
       const rotated = new THREE.Vector3(pos.x, pos.y, pos.z);
       rotated.applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
@@ -326,26 +345,26 @@ function PulleyMesh({
     }
     return pos;
   }, [pulley, boomAngle, rigging]);
-  
+
   const sheaveCount = pulley.type === "double" ? 2 : pulley.type === "triple" ? 3 : 1;
-  
+
   return (
     <group position={position}>
       {/* Block housing */}
       <mesh>
         <boxGeometry args={[0.03, 0.05 * sheaveCount, 0.025]} />
-        <meshStandardMaterial 
+        <meshStandardMaterial
           color={pulley.color}
           roughness={0.5}
           metalness={0.3}
           wireframe={showWireframe}
         />
       </mesh>
-      
+
       {/* Sheaves */}
       {Array.from({ length: sheaveCount }).map((_, i) => (
-        <mesh 
-          key={i} 
+        <mesh
+          key={i}
           position={[0, (i - (sheaveCount - 1) / 2) * 0.025, 0]}
           rotation={[Math.PI / 2, 0, 0]}
         >
@@ -353,7 +372,7 @@ function PulleyMesh({
           <meshStandardMaterial color="#666" roughness={0.3} metalness={0.5} />
         </mesh>
       ))}
-      
+
       {/* Becket/shackle */}
       <mesh position={[0, -0.03 * sheaveCount, 0]}>
         <torusGeometry args={[0.008, 0.003, 6, 12]} />
@@ -364,16 +383,16 @@ function PulleyMesh({
 }
 
 // Hiking strap
-function HikingStrap({ rigging }: { rigging: LaserRiggingParams }) {
+function HikingStrap() {
   const geometry = useMemo(() => {
     const start = new THREE.Vector3(0.3, 0.08, 0);
     const mid = new THREE.Vector3(-0.25, 0.12, 0);
     const end = new THREE.Vector3(-0.8, 0.08, 0);
-    
+
     const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
     return new THREE.TubeGeometry(curve, 20, 0.015, 8, false);
   }, []);
-  
+
   return (
     <mesh geometry={geometry}>
       <meshStandardMaterial color="#222" roughness={0.85} metalness={0} />
@@ -382,44 +401,54 @@ function HikingStrap({ rigging }: { rigging: LaserRiggingParams }) {
 }
 
 // Main Rigging Assembly
-export function RiggingMesh({ 
-  rigging = DEFAULT_LASER_RIGGING, 
+export function RiggingMesh({
+  rigging = DEFAULT_LASER_RIGGING,
   showWireframe = false,
   boomAngle = 0,
   rudderAngle = 0,
   windAngle = 0,
-  windStrength = 0.5
+  windStrength = 0.5,
+  highlightTarget = null
 }: RiggingMeshProps) {
   return (
     <group>
-      <MastMesh rigging={rigging} showWireframe={showWireframe} />
-      <BoomMesh rigging={rigging} showWireframe={showWireframe} angle={boomAngle} />
-      
+      <MastMesh rigging={rigging} showWireframe={showWireframe} highlight={highlightTarget === "mast"} />
+      <BoomMesh rigging={rigging} showWireframe={showWireframe} angle={boomAngle} highlight={highlightTarget === "boom"} />
+
       {/* Cloth-simulated sail */}
-      <ClothSail 
-        rigging={rigging} 
+      <ClothSail
+        rigging={rigging}
         boomAngle={boomAngle}
         windAngle={windAngle}
         windStrength={windStrength}
         showWireframe={showWireframe}
+        highlight={highlightTarget === "sail"}
       />
-      
+
       {/* Rope lines with catenary */}
-      <RopeLines 
+      <RopeLines
         rigging={rigging}
         boomAngle={boomAngle}
         showWireframe={showWireframe}
+        highlight={highlightTarget === "ropes"}
       />
-      
-      <CenterboardMesh rigging={rigging} showWireframe={showWireframe} />
-      <RudderMesh rigging={rigging} showWireframe={showWireframe} angle={rudderAngle} />
-      <HikingStrap rigging={rigging} />
-      
+
+      {/* Traveler system */}
+      <TravelerSystem
+        traveler={rigging.traveler}
+        showWireframe={showWireframe}
+        highlight={highlightTarget === "traveler"}
+      />
+
+      <CenterboardMesh rigging={rigging} showWireframe={showWireframe} highlight={highlightTarget === "centerboard"} />
+      <RudderMesh rigging={rigging} showWireframe={showWireframe} angle={rudderAngle} highlight={highlightTarget === "rudder"} />
+      <HikingStrap />
+
       {/* Pulleys */}
       {rigging.pulleys.map((pulley) => (
-        <PulleyMesh 
-          key={pulley.id} 
-          pulley={pulley} 
+        <PulleyMesh
+          key={pulley.id}
+          pulley={pulley}
           showWireframe={showWireframe}
           boomAngle={boomAngle}
           rigging={rigging}
