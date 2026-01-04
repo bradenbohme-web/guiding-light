@@ -1,9 +1,7 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera } from "@react-three/drei";
 import { Suspense } from "react";
-import { HullMesh } from "./HullMesh";
-import { RiggingMesh } from "./RiggingMesh";
-import { TransomCockpit } from "./TransomCockpit";
+import { BoatGroup } from "./BoatGroup";
 import { OceanEnvironment } from "./OceanEnvironment";
 import { HullParams } from "@/lib/parametric/types";
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING } from "@/lib/parametric/laserRigging";
@@ -25,10 +23,10 @@ interface Viewport3DProps {
   highlightTarget?: string | null;
 }
 
-export function Viewport3D({ 
-  params, 
-  resolution, 
-  showWireframe, 
+export function Viewport3D({
+  params,
+  resolution,
+  showWireframe,
   showGrid,
   viewMode,
   showRigging = true,
@@ -58,7 +56,7 @@ export function Viewport3D({
   const boomAngleRad = (boomAngle / 180) * Math.PI;
 
   return (
-    <div style={{ width: '100%', height: '100%', minHeight: '500px' }} className="bg-[#0a0f1a] rounded-lg overflow-hidden border border-border">
+    <div style={{ width: '100%', height: '100%', minHeight: '500px' }} className="bg-background rounded-lg overflow-hidden border border-border">
       <Canvas shadows style={{ width: '100%', height: '100%' }}>
         <PerspectiveCamera makeDefault position={camera.position} fov={camera.fov} />
         <Suspense fallback={null}>
@@ -74,7 +72,7 @@ export function Viewport3D({
               <pointLight position={[0, 5, 0]} intensity={0.3} />
             </>
           )}
-          
+
           {/* Grid */}
           {showGrid && !showOcean && (
             <Grid
@@ -90,32 +88,23 @@ export function Viewport3D({
               infiniteGrid
             />
           )}
-          
-          {/* Hull Model */}
-          <HullMesh
+
+          {/* Boat with hull, rigging, spray, bobbing */}
+          <BoatGroup
             params={params}
             resolution={resolution}
             showWireframe={showWireframe}
+            showRigging={showRigging}
+            rigging={rigging}
+            boomAngle={boomAngleRad}
+            rudderAngle={rudderAngle}
+            windAngle={windAngle}
+            windStrength={windStrength}
+            boatSpeed={boatSpeed}
+            showOcean={showOcean}
+            highlightTarget={highlightTarget}
           />
-          
-          {/* Transom and Cockpit */}
-          <TransomCockpit
-            params={params}
-            showWireframe={showWireframe}
-          />
-          
-          {/* Rigging - Mast, Boom, Sail, Centerboard, Rudder */}
-          {showRigging && (
-            <RiggingMesh
-              rigging={rigging}
-              showWireframe={showWireframe}
-              boomAngle={boomAngleRad}
-              rudderAngle={rudderAngle}
-              windAngle={windAngle}
-              windStrength={windStrength}
-            />
-          )}
-          
+
           {/* Controls */}
           <OrbitControls
             enableDamping
@@ -123,7 +112,7 @@ export function Viewport3D({
             minDistance={1}
             maxDistance={showOcean ? 100 : 25}
           />
-          
+
           {/* Gizmo */}
           <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
             <GizmoViewport labelColor="white" axisHeadScale={1} />
