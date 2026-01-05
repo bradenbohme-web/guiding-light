@@ -71,9 +71,9 @@ export function BoatGroup({
     groupRef.current.rotation.x = pitch * speedFactor;
   });
 
-  // Bow spray emitter position
+  // Bow spray emitter position - at the BOW (front/positive X)
   const bowEmitter = useMemo(() => {
-    return new THREE.Vector3(-params.length / 2 + 0.1, 0, 0);
+    return new THREE.Vector3(params.length / 2 - 0.1, 0, 0);
   }, [params.length]);
 
   return (
@@ -90,6 +90,7 @@ export function BoatGroup({
       <TransomCockpit
         params={params}
         showWireframe={showWireframe}
+        highlight={highlightTarget}
       />
 
       {/* Rigging */}

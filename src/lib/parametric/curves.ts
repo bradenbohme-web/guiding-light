@@ -44,6 +44,7 @@ export function lerp(a: number, b: number, t: number): number {
 }
 
 // Evaluate beam curve B(u) - half-width distribution
+// u=0 is STERN (aft), u=1 is BOW (forward)
 export function evalBeamCurve(u: number, params: {
   beam: number;
   bowTaperMin: number;
@@ -51,28 +52,38 @@ export function evalBeamCurve(u: number, params: {
   taperPower: number;
   bowTipPoint: number;
   bowTipRound: number;
+  sternFlatWidth?: number;
+  sternFlatBlend?: number;
 }): number {
   const { beam, bowTaperMin, sternTaperMin, taperPower, bowTipPoint, bowTipRound } = params;
+  const sternFlatWidth = params.sternFlatWidth ?? 0.85;
+  const sternFlatBlend = params.sternFlatBlend ?? 0.15;
   const halfBeam = beam / 2;
   
   // Base taper envelope
   let taperFactor = 1;
   
-  // Bow taper (u approaching 1)
+  // Bow taper (u approaching 1) - comes to a point
   if (u > 0.5) {
     const bowU = (u - 0.5) * 2; // 0 to 1 over bow half
     const bowTaper = 1 - Math.pow(bowU, taperPower) * (1 - bowTaperMin);
     taperFactor *= bowTaper;
   }
   
-  // Stern taper (u approaching 0)
-  if (u < 0.5) {
-    const sternU = (0.5 - u) * 2; // 0 to 1 over stern half
-    const sternTaper = 1 - Math.pow(sternU, taperPower) * (1 - sternTaperMin);
-    taperFactor *= sternTaper;
+  // Stern taper (u approaching 0) - STAYS WIDE for flat transom
+  // Real Laser has wide, flat transom - not pointed like bow
+  if (u < sternFlatBlend) {
+    // Very minimal taper at stern - keeps it wide
+    const sternU = u / sternFlatBlend; // 0 at transom, 1 at blend point
+    // Blend from sternFlatWidth to 1.0 over the blend region
+    taperFactor *= lerp(sternFlatWidth, 1.0, smoothstep(0, 1, sternU));
+  } else if (u < 0.5) {
+    // Gradual curve in mid-stern section
+    const midU = (u - sternFlatBlend) / (0.5 - sternFlatBlend);
+    taperFactor *= lerp(1.0, 1.0, midU); // Stays at full width
   }
   
-  // Bow tip shaping
+  // Bow tip shaping (pointed bow)
   if (u > 0.9) {
     const tipU = (u - 0.9) / 0.1;
     const tipFactor = 1 - tipU * bowTipPoint;
