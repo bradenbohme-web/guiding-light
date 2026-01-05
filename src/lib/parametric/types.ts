@@ -52,6 +52,11 @@ export interface HullParams {
   taperPower: number;
   bowTipPoint: number;
   bowTipRound: number;
+  // Stern/Transom shape parameters
+  sternFlatWidth: number;     // How wide the flat transom is (0-1 of beam)
+  sternFlatBlend: number;     // How smoothly hull blends into transom (0-1)
+  transomHeight: number;      // Height of transom relative to deck (0-1)
+  transomRake: number;        // Transom rake angle in degrees (0-15)
 }
 
 export interface VertexData {
@@ -119,8 +124,13 @@ export const DEFAULT_HULL_PARAMS: HullParams = {
   bowLiftAmp: 0.03,
   sternDeckDrop: 0.02,
   bowTaperMin: 0.02,
-  sternTaperMin: 0.05,
+  sternTaperMin: 0.75,  // Much wider stern - real Laser has wide transom
   taperPower: 1.6,
   bowTipPoint: 0.70,
   bowTipRound: 0.55,
+  // Stern/Transom 
+  sternFlatWidth: 0.85,      // Wide flat transom
+  sternFlatBlend: 0.15,      // Smooth blend from hull to transom
+  transomHeight: 0.85,       // Transom extends most of hull height
+  transomRake: 8,            // Slight rake angle
 };

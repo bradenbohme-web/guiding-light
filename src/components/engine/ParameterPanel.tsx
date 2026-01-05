@@ -192,8 +192,8 @@ export function ParameterPanel({ params, onChange }: ParameterPanelProps) {
             <ParamSlider
               label="Stern Taper Min"
               value={params.sternTaperMin}
-              min={0}
-              max={0.3}
+              min={0.3}
+              max={1}
               step={0.01}
               onChange={(v) => updateParam("sternTaperMin", v)}
             />
@@ -229,6 +229,51 @@ export function ParameterPanel({ params, onChange }: ParameterPanelProps) {
               max={1}
               step={0.01}
               onChange={(v) => updateParam("bowTipRound", v)}
+            />
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Stern / Transom */}
+        <div>
+          <h3 className="text-sm font-semibold mb-4 text-foreground">Stern / Transom</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Laser dinghies have a wide, flat transom (not pointed like the bow)
+          </p>
+          <div className="space-y-4">
+            <ParamSlider
+              label="Stern Flat Width"
+              value={params.sternFlatWidth}
+              min={0.3}
+              max={1}
+              step={0.01}
+              onChange={(v) => updateParam("sternFlatWidth", v)}
+            />
+            <ParamSlider
+              label="Stern Blend Region"
+              value={params.sternFlatBlend}
+              min={0.05}
+              max={0.4}
+              step={0.01}
+              onChange={(v) => updateParam("sternFlatBlend", v)}
+            />
+            <ParamSlider
+              label="Transom Height"
+              value={params.transomHeight}
+              min={0.5}
+              max={1}
+              step={0.01}
+              onChange={(v) => updateParam("transomHeight", v)}
+            />
+            <ParamSlider
+              label="Transom Rake"
+              value={params.transomRake}
+              min={0}
+              max={15}
+              step={0.5}
+              unit="°"
+              onChange={(v) => updateParam("transomRake", v)}
             />
           </div>
         </div>
