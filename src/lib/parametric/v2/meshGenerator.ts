@@ -3,6 +3,7 @@
 // ============================================
 // Generates proper 2-piece hull: Deck sheet + Bottom hull
 // Features: Deck crown, lip elbow, bow knife edge, flat transom
+// Improved seam transitions between all components
 
 import * as THREE from 'three';
 import { HullV2Params, MeshResolution, MESH_RESOLUTIONS } from './types';
@@ -24,9 +25,15 @@ export interface GeneratedMeshV2 {
   triangleCount: number;
 }
 
+// Smooth blending function for seamless transitions
+function seamBlend(t: number, sharpness: number = 2): number {
+  return Math.pow(t, sharpness) * (3 - 2 * t);
+}
+
 // ============================================
 // BOTTOM HULL MESH
 // The main hull body below the deck seam
+// Includes smooth transition to transom at stern
 // ============================================
 
 export function generateBottomHullV2(
@@ -53,6 +60,9 @@ export function generateBottomHullV2(
       const yDeck = evalDeckV2(u, params);
       const deckCrown = evalDeckCrownV2(u, params);
       
+      // Stern transition blend - smooth blend near u=0
+      const sternBlend = smoothstep(0, params.beam.sternBlend, u);
+      
       for (let j = 0; j <= Nv; j++) {
         const s = j / Nv;
         let z = side * s * halfBeam;
@@ -62,9 +72,9 @@ export function generateBottomHullV2(
         let y = yKeel + (yDeck - yKeel) * t;
         
         // Apply deck crown near top (s approaching 1)
-        if (s > 0.9) {
-          const crownT = (s - 0.9) / 0.1;
-          const normalizedZ = Math.abs(z) / halfBeam;
+        if (s > 0.85) {
+          const crownT = smoothstep(0.85, 1.0, s);
+          const normalizedZ = Math.abs(z) / (halfBeam + 0.001);
           const crownOffset = deckCrown * Math.pow(1 - normalizedZ * normalizedZ, params.deck.crownPower);
           y += crownOffset * crownT;
         }
@@ -73,9 +83,19 @@ export function generateBottomHullV2(
         const bevelPush = bowBevelConstraint(x, y, params);
         const adjustedX = x - bevelPush;
         
-        positions.push(adjustedX, y, z);
+        // Smooth stern-to-transom transition
+        // At very stern (u near 0), blend vertices toward transom plane
+        if (u < params.beam.sternBlend * 0.5) {
+          const transomBlend = 1 - smoothstep(0, params.beam.sternBlend * 0.5, u);
+          const transomX = -length / 2;
+          const blendedX = lerp(adjustedX, transomX + 0.005, transomBlend * 0.3);
+          positions.push(blendedX, y, z);
+        } else {
+          positions.push(adjustedX, y, z);
+        }
+        
         uvs.push(u, (side + 1) / 2 * 0.5 + s * 0.5);
-        normals.push(0, 1, 0); // Placeholder
+        normals.push(0, 1, 0); // Placeholder - computed later
       }
     }
   }
@@ -122,6 +142,7 @@ export function generateBottomHullV2(
 // ============================================
 // DECK SHEET MESH
 // Flat in side view, crowned at stern
+// Seamlessly connects to lip at edges
 // ============================================
 
 export function generateDeckSheetV2(
@@ -148,15 +169,19 @@ export function generateDeckSheetV2(
     const bevelPush = bowBevelConstraint(x, yDeck, params);
     const adjustedX = x - bevelPush;
     
+    // Deck inset from rail to match lip attachment
+    const lipInset = params.lip.overhang * 0.7;
+    
     for (let j = 0; j <= Nv; j++) {
       const s = j / Nv;
       const zNorm = s * 2 - 1; // -1 to 1
-      const z = zNorm * halfBeam * 0.95; // Slightly inset from rail
+      const z = zNorm * (halfBeam - lipInset);
       
-      // Apply crown across beam
+      // Apply crown across beam with smooth falloff at edges
       const normalizedZ = Math.abs(zNorm);
+      const edgeFade = smoothstep(0.85, 1.0, normalizedZ);
       const crownOffset = deckCrown * Math.pow(1 - normalizedZ * normalizedZ, params.deck.crownPower);
-      const y = yDeck + crownOffset;
+      const y = yDeck + crownOffset * (1 - edgeFade * 0.3);
       
       positions.push(adjustedX, y, z);
       normals.push(0, 1, 0);
@@ -194,6 +219,7 @@ export function generateDeckSheetV2(
 // ============================================
 // LIP ELBOW MESH
 // 30mm finger-grip around deck perimeter
+// Smooth transition from deck edge to hull
 // ============================================
 
 export function generateLipElbowV2(
@@ -219,27 +245,40 @@ export function generateLipElbowV2(
       const yDeck = evalDeckV2(u, params);
       const deckCrown = evalDeckCrownV2(u, params);
       
-      // Lip attachment point (at rail)
-      const attachZ = side * halfBeam;
-      const attachY = yDeck; // Top of rail
+      // Lip attachment point matches deck edge
+      const lipInset = overhang * 0.7;
+      const attachZ = side * (halfBeam - lipInset);
+      const attachY = yDeck;
+      
+      // Transom corner sharpness - more squared at stern
+      const cornerSharpness = u < 0.1 
+        ? lerp(params.lip.transomUpperSharpness, 0.5, smoothstep(0, 0.1, u))
+        : 0.5;
       
       // Generate lip profile points
       for (let j = 0; j <= lipSamples; j++) {
         const t = j / lipSamples;
         
-        // Lip follows arc from top to underside
-        const angle = t * Math.PI * 0.5; // Quarter circle
+        // Lip follows arc from top to underside with variable sharpness
+        const angle = t * Math.PI * (0.4 + 0.1 * cornerSharpness);
         const lipOffsetZ = side * overhang * Math.sin(angle);
         const lipOffsetY = -drop * (1 - Math.cos(angle));
         
-        // Add tuck sharpness effect
-        const tuckY = -drop * t * t * tuckSharpness;
+        // Add tuck sharpness effect with smooth blend
+        const tuckY = -drop * seamBlend(t, 2) * tuckSharpness;
         
         const z = attachZ + lipOffsetZ;
         const y = attachY + lipOffsetY + tuckY;
         
         positions.push(x, y, z);
-        normals.push(0, -side * Math.sin(angle), Math.cos(angle));
+        
+        // Normal calculation
+        const nx = 0;
+        const ny = Math.cos(angle) * 0.5;
+        const nz = side * Math.sin(angle);
+        const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+        normals.push(nx / nLen, ny / nLen, nz / nLen);
+        
         uvs.push(u, t);
       }
     }
@@ -287,6 +326,7 @@ export function generateLipElbowV2(
 // ============================================
 // TRANSOM FACE MESH
 // Flat vertical stern plate
+// Seamless connection to hull and deck
 // ============================================
 
 export function generateTransomV2(
@@ -295,11 +335,14 @@ export function generateTransomV2(
 ): GeneratedMeshV2 {
   const Nv = MESH_RESOLUTIONS[resolution].Nv;
   const { beam, heightDeck, heightKeel } = params.dimensions;
-  const { width, topCrown, bottomCrown, rake, height } = params.transom;
+  const { width, topCrown, bottomCrown, rake, height, lowerCornerRadius } = params.transom;
   const { length } = params.dimensions;
   
-  const halfWidth = (beam / 2) * width;
-  const topY = heightDeck - 0.01;
+  // Get stern dimensions from hull curves for seamless match
+  const sternHalfBeam = evalBeamV2(0, params);
+  const halfWidth = Math.min(sternHalfBeam, (beam / 2) * width);
+  
+  const topY = heightDeck - 0.005; // Slight offset for clean seam
   const bottomY = -heightKeel * height;
   const sternX = -length / 2;
   
@@ -319,8 +362,9 @@ export function generateTransomV2(
     const vFrac = j / Ny;
     const y = lerp(bottomY, topY, vFrac);
     
-    // Interpolate crown from bottom to top
-    const crown = lerp(bottomCrown, topCrown, vFrac);
+    // Interpolate crown from bottom to top with smooth blend
+    const crownBlend = seamBlend(vFrac, 1.5);
+    const crown = lerp(bottomCrown, topCrown, crownBlend);
     
     // Rake offset at this height
     const xOffset = rakeOffset * vFrac;
@@ -328,14 +372,27 @@ export function generateTransomV2(
     for (let i = 0; i <= Nz; i++) {
       const uFrac = i / Nz;
       const zNorm = uFrac * 2 - 1; // -1 to 1
-      const baseZ = zNorm * halfWidth;
+      let baseZ = zNorm * halfWidth;
+      
+      // Apply lower corner rounding
+      if (vFrac < 0.25 && Math.abs(zNorm) > 0.7) {
+        const cornerT = (1 - vFrac / 0.25) * ((Math.abs(zNorm) - 0.7) / 0.3);
+        const cornerRadius = lowerCornerRadius * cornerT;
+        const inset = Math.sign(zNorm) * cornerRadius * 0.5;
+        baseZ -= inset;
+      }
       
       // Apply crown
       const crownOffset = crown * (1 - zNorm * zNorm);
       const adjustedY = y + crownOffset;
       
       positions.push(sternX - xOffset, adjustedY, baseZ);
-      normals.push(-1, 0, 0); // Facing aft
+      
+      // Normal facing aft with slight rake
+      const nx = -Math.cos(rakeRad);
+      const ny = Math.sin(rakeRad) * 0.1;
+      normals.push(nx, ny, 0);
+      
       uvs.push(uFrac, vFrac);
     }
   }
@@ -370,6 +427,7 @@ export function generateTransomV2(
 // ============================================
 // BOW CAP MESH
 // Knife edge closure at bow
+// Smooth blend from hull to knife edge
 // ============================================
 
 export function generateBowCapV2(
@@ -389,9 +447,10 @@ export function generateBowCapV2(
   const indices: number[] = [];
   
   // Sample the knife edge and surrounding surface
-  const knifeEdgeSamples = Math.floor(Nv / 2);
+  const knifeEdgeSamples = Math.max(8, Math.floor(Nv / 2));
+  const widthSamples = 5; // Samples across width of bow cap
   
-  // Generate knife edge vertices
+  // Generate bow cap as a smooth surface from knife edge to hull
   for (let i = 0; i <= knifeEdgeSamples; i++) {
     const t = i / knifeEdgeSamples;
     
@@ -401,39 +460,50 @@ export function generateBowCapV2(
     const y = lerp(keelY, deckY, t);
     
     // X position along knife edge
-    const edgeX = bowX - edgeLength * Math.cos(angleRad) * t;
+    const edgeX = bowX - edgeLength * Math.cos(angleRad) * (1 - t);
     
-    // Add center vertex (on knife edge)
-    positions.push(edgeX + tipRadius, y, 0);
-    normals.push(1, 0, 0);
-    uvs.push(0.5, t);
+    // Get beam at this height fraction
+    const heightFrac = 1 - t * 0.15; // Slightly behind bow tip
+    const halfBeam = evalBeamV2(heightFrac, params);
     
-    // Add side vertices (with bullnose rounding)
-    const halfBeam = evalBeamV2(1 - t * 0.1, params);
-    const sideZ = Math.min(halfBeam, bullnoseRadius * 3);
-    
-    positions.push(edgeX, y, sideZ);
-    normals.push(0.7, 0, 0.7);
-    uvs.push(0.7, t);
-    
-    positions.push(edgeX, y, -sideZ);
-    normals.push(0.7, 0, -0.7);
-    uvs.push(0.3, t);
+    for (let j = 0; j <= widthSamples; j++) {
+      const s = j / widthSamples;
+      const sNorm = s * 2 - 1; // -1 to 1
+      
+      // Blend from knife edge (s=0.5) to sides
+      const sideBlend = Math.abs(sNorm);
+      const sideWidth = Math.min(halfBeam * 0.3, bullnoseRadius * 4) * sideBlend;
+      
+      // X pulls back at sides for smooth hull blend
+      const xPullback = shoulderBlend * sideBlend * sideBlend;
+      const finalX = edgeX - xPullback + tipRadius * (1 - sideBlend);
+      
+      const z = sNorm * sideWidth;
+      
+      positions.push(finalX, y, z);
+      
+      // Normal calculation - blend from forward to outward
+      const nx = 1 - sideBlend * 0.5;
+      const ny = 0;
+      const nz = sNorm * sideBlend;
+      const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      normals.push(nx / nLen, ny / nLen, nz / nLen);
+      
+      uvs.push(s, t);
+    }
   }
   
-  // Generate indices (triangles connecting knife edge to sides)
-  const vertsPerRow = 3;
+  // Generate indices
   for (let i = 0; i < knifeEdgeSamples; i++) {
-    const row0 = i * vertsPerRow;
-    const row1 = (i + 1) * vertsPerRow;
-    
-    // Center to right side
-    indices.push(row0, row1, row0 + 1);
-    indices.push(row0 + 1, row1, row1 + 1);
-    
-    // Center to left side
-    indices.push(row0, row0 + 2, row1);
-    indices.push(row0 + 2, row1 + 2, row1);
+    for (let j = 0; j < widthSamples; j++) {
+      const a = i * (widthSamples + 1) + j;
+      const b = (i + 1) * (widthSamples + 1) + j;
+      const c = (i + 1) * (widthSamples + 1) + j + 1;
+      const d = i * (widthSamples + 1) + j + 1;
+      
+      indices.push(a, b, c);
+      indices.push(a, c, d);
+    }
   }
   
   const geometry = new THREE.BufferGeometry();
