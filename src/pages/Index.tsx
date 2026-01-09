@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { Viewport3D } from "@/components/engine/Viewport3D";
+import { Viewport3DV2 } from "@/components/engine/Viewport3DV2";
 import { ParameterPanel } from "@/components/engine/ParameterPanel";
+import { HullV2SettingsPanel } from "@/components/engine/HullV2SettingsPanel";
 import { Toolbar } from "@/components/engine/Toolbar";
 import { CurvePanel } from "@/components/engine/CurveViewer";
 import { RiggingPanel } from "@/components/engine/RiggingPanel";
@@ -8,14 +10,26 @@ import { ReferencePack, ReferencePackState, DEFAULT_REFERENCE_PACK } from "@/com
 import { InteractiveCurveEditor } from "@/components/engine/InteractiveCurveEditor";
 import { HeatmapGradientEditor, GradientStop, DEFAULT_GRADIENT_STOPS } from "@/components/engine/HeatmapGradientEditor";
 import { HullParams, DEFAULT_HULL_PARAMS } from "@/lib/parametric/types";
+import { HullV2Params, DEFAULT_HULL_V2_PARAMS } from "@/lib/parametric/v2/types";
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING } from "@/lib/parametric/laserRigging";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cpu, Settings, TrendingUp, Sailboat, Grid2X2, Image, Waves } from "lucide-react";
+import { Cpu, Settings, TrendingUp, Sailboat, Grid2X2, Image } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const Index = () => {
+  // Hull version toggle
+  const [useV2Hull, setUseV2Hull] = useState(true);
+  
+  // V1 Hull params
   const [params, setParams] = useState<HullParams>({ ...DEFAULT_HULL_PARAMS });
+  
+  // V2 Hull params
+  const [paramsV2, setParamsV2] = useState<HullV2Params>({ ...DEFAULT_HULL_V2_PARAMS });
+  
+  // Shared state
   const [rigging, setRigging] = useState<LaserRiggingParams>({ ...DEFAULT_LASER_RIGGING });
   const [resolution, setResolution] = useState<"low" | "medium" | "high">("medium");
   const [showWireframe, setShowWireframe] = useState(false);
@@ -35,6 +49,7 @@ const Index = () => {
 
   const handleReset = () => {
     setParams({ ...DEFAULT_HULL_PARAMS });
+    setParamsV2({ ...DEFAULT_HULL_V2_PARAMS });
     setRigging({ ...DEFAULT_LASER_RIGGING });
     setBoomAngle(0);
     setRudderAngle(0);
@@ -51,10 +66,26 @@ const Index = () => {
   const meshStats = useMemo(() => {
     const resMap = { low: { Nu: 32, Nv: 16 }, medium: { Nu: 64, Nv: 32 }, high: { Nu: 128, Nv: 64 } };
     const { Nu, Nv } = resMap[resolution];
-    const vertexCount = 2 * (Nu + 1) * (Nv + 1);
-    const triangleCount = 2 * Nu * Nv * 2;
+    const vertexCount = useV2Hull ? 5 * (Nu + 1) * (Nv + 1) : 2 * (Nu + 1) * (Nv + 1);
+    const triangleCount = useV2Hull ? 5 * Nu * Nv * 2 : 2 * Nu * Nv * 2;
     return { vertexCount, triangleCount };
-  }, [resolution]);
+  }, [resolution, useV2Hull]);
+
+  // Get display dimensions based on hull version
+  const displayDimensions = useMemo(() => {
+    if (useV2Hull) {
+      return {
+        length: paramsV2.dimensions.length,
+        beam: paramsV2.dimensions.beam,
+        height: paramsV2.dimensions.heightDeck,
+      };
+    }
+    return {
+      length: params.length,
+      beam: params.beam,
+      height: params.height,
+    };
+  }, [useV2Hull, params, paramsV2]);
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
@@ -69,8 +100,27 @@ const Index = () => {
             <p className="text-xs text-muted-foreground">Universal Parametric Asset Engine</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
-          <span className="px-2 py-1 bg-accent/20 text-accent rounded">Laser Hull v1</span>
+        
+        {/* Hull Version Toggle */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-1.5">
+            <span className={cn(
+              "text-xs font-mono transition-colors",
+              !useV2Hull ? "text-foreground" : "text-muted-foreground"
+            )}>V1</span>
+            <Switch 
+              checked={useV2Hull} 
+              onCheckedChange={setUseV2Hull}
+              className="data-[state=checked]:bg-primary"
+            />
+            <span className={cn(
+              "text-xs font-mono transition-colors",
+              useV2Hull ? "text-foreground" : "text-muted-foreground"
+            )}>V2</span>
+          </div>
+          <Badge variant={useV2Hull ? "default" : "secondary"} className="font-mono text-xs">
+            {useV2Hull ? "Hull V2 - 5 Piece" : "Hull V1 - Legacy"}
+          </Badge>
         </div>
       </header>
 
@@ -92,8 +142,8 @@ const Index = () => {
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Parameters */}
-          <div className="w-96 border-r border-border bg-card flex flex-col min-h-0">
-            <Tabs defaultValue="params" className="flex-1 flex flex-col min-h-0">
+        <div className="w-96 border-r border-border bg-card flex flex-col min-h-0">
+          <Tabs defaultValue="params" className="flex-1 flex flex-col min-h-0">
             <TabsList className="w-full justify-start rounded-none border-b border-border bg-transparent px-2">
               <TabsTrigger value="params" className="gap-1.5 data-[state=active]:bg-secondary text-xs">
                 <Settings className="w-3.5 h-3.5" />
@@ -118,7 +168,15 @@ const Index = () => {
             </TabsList>
             
             <TabsContent value="params" className="flex-1 min-h-0 m-0 overflow-y-auto scrollbar-hide">
-              <ParameterPanel params={params} onChange={setParams} />
+              {useV2Hull ? (
+                <HullV2SettingsPanel 
+                  params={paramsV2} 
+                  onChange={setParamsV2}
+                  onHoverPart={setHighlightTarget}
+                />
+              ) : (
+                <ParameterPanel params={params} onChange={setParams} />
+              )}
             </TabsContent>
             
             <TabsContent value="rigging" className="flex-1 min-h-0 m-0 overflow-y-auto scrollbar-hide p-4">
@@ -199,26 +257,49 @@ const Index = () => {
 
         {/* Main Viewport */}
         <div className="flex-1 relative h-full">
-          <Viewport3D
-            params={params}
-            resolution={resolution}
-            showWireframe={showWireframe}
-            showGrid={showGrid}
-            viewMode={viewMode}
-            showRigging={showRigging}
-            showOcean={showOcean}
-            rigging={rigging}
-            boomAngle={boomAngle}
-            rudderAngle={rudderAngle}
-            windAngle={windAngle}
-            windStrength={windStrength}
-            boatSpeed={boatSpeed}
-            highlightTarget={highlightTarget}
-          />
+          {useV2Hull ? (
+            <Viewport3DV2
+              params={paramsV2}
+              resolution={resolution}
+              showWireframe={showWireframe}
+              showGrid={showGrid}
+              viewMode={viewMode}
+              showRigging={showRigging}
+              showOcean={showOcean}
+              rigging={rigging}
+              boomAngle={boomAngle}
+              rudderAngle={rudderAngle}
+              windAngle={windAngle}
+              windStrength={windStrength}
+              boatSpeed={boatSpeed}
+              highlightTarget={highlightTarget}
+            />
+          ) : (
+            <Viewport3D
+              params={params}
+              resolution={resolution}
+              showWireframe={showWireframe}
+              showGrid={showGrid}
+              viewMode={viewMode}
+              showRigging={showRigging}
+              showOcean={showOcean}
+              rigging={rigging}
+              boomAngle={boomAngle}
+              rudderAngle={rudderAngle}
+              windAngle={windAngle}
+              windStrength={windStrength}
+              boatSpeed={boatSpeed}
+              highlightTarget={highlightTarget}
+            />
+          )}
           
           {/* Viewport overlay info */}
           <div className="absolute bottom-4 left-4 text-xs font-mono text-muted-foreground bg-background/80 backdrop-blur px-3 py-2 rounded-lg border border-border">
-            <div>Length: {params.length.toFixed(2)}m | Beam: {params.beam.toFixed(2)}m | Height: {params.height.toFixed(2)}m</div>
+            <div>
+              Length: {displayDimensions.length.toFixed(2)}m | 
+              Beam: {displayDimensions.beam.toFixed(2)}m | 
+              Height: {displayDimensions.height.toFixed(2)}m
+            </div>
             <div className="flex items-center gap-3 mt-1">
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <Switch 
