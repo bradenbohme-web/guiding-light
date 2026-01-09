@@ -74,7 +74,7 @@ export function Viewport3DV2({
 
         {/* Environment */}
         {showOcean ? (
-          <OceanEnvironment windAngle={windAngle} windStrength={windStrength} />
+          <OceanEnvironment enabled={true} />
         ) : (
           <>
             {/* Studio lighting for non-ocean mode */}

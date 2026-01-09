@@ -3,8 +3,7 @@ import { useRef, useMemo, useEffect } from "react";
 import * as THREE from "three";
 import { 
   HullV2Params, 
-  MESH_RESOLUTIONS,
-  HULL_V2_PARTS,
+  HULL_PARTS,
 } from "@/lib/parametric/v2/types";
 import { generateCompleteHullV2 } from "@/lib/parametric/v2/meshGenerator";
 
@@ -38,12 +37,10 @@ export function HullMeshV2({
   const bowCapRef = useRef<THREE.Mesh>(null);
   const wireframeRef = useRef<THREE.LineSegments>(null);
 
-  const meshResolution = MESH_RESOLUTIONS[resolution];
-
-  // Generate all hull geometries
+  // Generate all hull geometries - pass resolution string directly
   const hullParts = useMemo(() => {
-    return generateCompleteHullV2(params, meshResolution);
-  }, [params, meshResolution]);
+    return generateCompleteHullV2(params, resolution);
+  }, [params, resolution]);
 
   // Wireframe geometry (combined from all parts)
   const wireframeGeometry = useMemo(() => {
@@ -80,7 +77,7 @@ export function HullMeshV2({
           metalness={0.25}
           roughness={0.55}
           side={THREE.DoubleSide}
-          {...getEmissive("bottomHull")}
+          {...getEmissive("bottom_hull")}
         />
       </mesh>
 
@@ -91,7 +88,7 @@ export function HullMeshV2({
           metalness={0.1}
           roughness={0.75}
           side={THREE.DoubleSide}
-          {...getEmissive("deckSheet")}
+          {...getEmissive("deck_sheet")}
         />
       </mesh>
 
@@ -102,7 +99,7 @@ export function HullMeshV2({
           metalness={0.3}
           roughness={0.5}
           side={THREE.DoubleSide}
-          {...getEmissive("lipElbow")}
+          {...getEmissive("lip_elbow")}
         />
       </mesh>
 
@@ -113,7 +110,7 @@ export function HullMeshV2({
           metalness={0.25}
           roughness={0.55}
           side={THREE.DoubleSide}
-          {...getEmissive("transom")}
+          {...getEmissive("transom_face")}
         />
       </mesh>
 
@@ -124,7 +121,7 @@ export function HullMeshV2({
           metalness={0.25}
           roughness={0.55}
           side={THREE.DoubleSide}
-          {...getEmissive("bowCap")}
+          {...getEmissive("bow_knife")}
         />
       </mesh>
 

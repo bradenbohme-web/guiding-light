@@ -2,10 +2,9 @@
 import { useState, useCallback } from "react";
 import { 
   HullV2Params, 
-  PARAM_V2_GROUPS, 
+  PARAM_GROUPS, 
   ParamGroupDef,
-  ParamSliderDef,
-  HULL_V2_PARTS,
+  HULL_PARTS,
 } from "@/lib/parametric/v2/types";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -20,6 +19,10 @@ import {
   CornerDownRight, 
   Navigation, 
   TrendingUp,
+  Ship,
+  Layers,
+  Grip,
+  Sword,
   Info
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,6 +42,10 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   CornerDownRight,
   Navigation,
   TrendingUp,
+  Ship,
+  Layers,
+  Grip,
+  Sword,
 };
 
 // Helper to get/set nested values
@@ -60,17 +67,34 @@ function setNestedValue(obj: any, path: string, value: number): any {
 }
 
 // Parameter Slider Component
+interface ParamDef {
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  unit?: string;
+  tooltip: string;
+  hoverTarget?: string;
+}
+
 function ParamSlider({
   def,
   value,
   onChange,
+  onHover,
 }: {
-  def: ParamSliderDef;
+  def: ParamDef;
   value: number;
   onChange: (value: number) => void;
+  onHover: (target: string | null) => void;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div 
+      className="space-y-1.5"
+      onMouseEnter={() => def.hoverTarget && onHover(def.hoverTarget)}
+      onMouseLeave={() => onHover(null)}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Label className="text-xs font-medium">{def.label}</Label>
@@ -86,7 +110,7 @@ function ParamSlider({
           </TooltipProvider>
         </div>
         <span className="text-xs font-mono text-muted-foreground">
-          {value.toFixed(def.step < 0.01 ? 3 : def.step < 0.1 ? 2 : 1)}{def.unit}
+          {value.toFixed(def.step < 0.01 ? 3 : def.step < 0.1 ? 2 : 1)}{def.unit || ''}
         </span>
       </div>
       <Slider
@@ -118,15 +142,15 @@ function ParamGroup({
   onToggle: () => void;
 }) {
   const Icon = ICONS[group.icon] || Square;
-  const linkedPart = group.linkedPart 
-    ? HULL_V2_PARTS.find(p => p.id === group.linkedPart)
-    : null;
+
+  // Get the first hover target from params to use as group hover
+  const groupHoverTarget = group.params[0]?.hoverTarget;
 
   const handleMouseEnter = useCallback(() => {
-    if (group.linkedPart) {
-      onHoverPart(group.linkedPart);
+    if (groupHoverTarget) {
+      onHoverPart(groupHoverTarget);
     }
-  }, [group.linkedPart, onHoverPart]);
+  }, [groupHoverTarget, onHoverPart]);
 
   const handleMouseLeave = useCallback(() => {
     onHoverPart(null);
@@ -142,8 +166,7 @@ function ParamGroup({
         className={cn(
           "w-full flex items-center gap-2 p-3 rounded-lg transition-colors",
           "hover:bg-accent/50 border border-transparent",
-          isOpen && "bg-accent/30 border-border",
-          linkedPart && "cursor-pointer"
+          isOpen && "bg-accent/30 border-border"
         )}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -153,12 +176,6 @@ function ParamGroup({
           <div className="text-sm font-medium">{group.name}</div>
           <div className="text-xs text-muted-foreground">{group.description}</div>
         </div>
-        {linkedPart && (
-          <div 
-            className="w-3 h-3 rounded-full border border-border"
-            style={{ backgroundColor: linkedPart.color }}
-          />
-        )}
         <ChevronDown className={cn(
           "w-4 h-4 text-muted-foreground transition-transform",
           isOpen && "rotate-180"
@@ -172,6 +189,7 @@ function ParamGroup({
             def={paramDef}
             value={getNestedValue(params, paramDef.key)}
             onChange={(v) => handleParamChange(paramDef.key, v)}
+            onHover={onHoverPart}
           />
         ))}
       </CollapsibleContent>
@@ -185,7 +203,7 @@ export function HullV2SettingsPanel({
   onHoverPart,
 }: HullV2SettingsPanelProps) {
   const [openGroups, setOpenGroups] = useState<Set<string>>(
-    new Set(["dimensions", "hull"])
+    new Set(["dimensions", "bottom"])
   );
 
   const toggleGroup = useCallback((groupId: string) => {
@@ -200,6 +218,9 @@ export function HullV2SettingsPanel({
     });
   }, []);
 
+  // Convert HULL_PARTS record to array for legend
+  const partsArray = Object.values(HULL_PARTS);
+
   return (
     <div className="p-4 space-y-2">
       <div className="flex items-center justify-between mb-4">
@@ -208,12 +229,12 @@ export function HullV2SettingsPanel({
           Hull V2 Parameters
         </h3>
         <span className="text-xs text-muted-foreground font-mono">
-          {PARAM_V2_GROUPS.reduce((acc, g) => acc + g.params.length, 0)} params
+          {PARAM_GROUPS.reduce((acc, g) => acc + g.params.length, 0)} params
         </span>
       </div>
       
       <div className="space-y-1">
-        {PARAM_V2_GROUPS.map((group) => (
+        {PARAM_GROUPS.map((group) => (
           <ParamGroup
             key={group.id}
             group={group}
@@ -230,7 +251,7 @@ export function HullV2SettingsPanel({
       <div className="pt-4 border-t border-border mt-4">
         <h4 className="text-xs font-medium text-muted-foreground mb-2">Hull Parts</h4>
         <div className="grid grid-cols-2 gap-2">
-          {HULL_V2_PARTS.map((part) => (
+          {partsArray.map((part) => (
             <div 
               key={part.id}
               className="flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer hover:bg-accent/30 transition-colors"
@@ -238,8 +259,7 @@ export function HullV2SettingsPanel({
               onMouseLeave={() => onHoverPart(null)}
             >
               <div 
-                className="w-3 h-3 rounded border border-border"
-                style={{ backgroundColor: part.color }}
+                className="w-3 h-3 rounded border border-border bg-primary/60"
               />
               <span>{part.name}</span>
             </div>
