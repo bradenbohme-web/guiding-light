@@ -244,8 +244,8 @@ export function generateDeckSheetV2(
 
 // ============================================
 // LIP ELBOW MESH
-// 30mm finger-grip around deck perimeter
-// Smooth transition from deck edge to hull
+// 30mm finger-grip around ENTIRE deck perimeter
+// Includes transom edge - wraps all the way around
 // ============================================
 
 export function generateLipElbowV2(
@@ -254,85 +254,141 @@ export function generateLipElbowV2(
 ): GeneratedMeshV2 {
   const { Nu, lipSamples } = MESH_RESOLUTIONS[resolution];
   const { length } = params.dimensions;
-  const { overhang, drop, radiusTop, tuckSharpness } = params.lip;
+  const { overhang, drop, tuckSharpness } = params.lip;
   
   const positions: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
   
-  // Generate lip around perimeter
-  for (let side = -1; side <= 1; side += 2) {
-    for (let i = 0; i <= Nu; i++) {
-      const u = i / Nu;
-      const x = (u - 0.5) * length;
+  // We need to generate lip around the entire perimeter:
+  // 1. Port side (stern to bow)
+  // 2. Bow transition
+  // 3. Starboard side (bow to stern)
+  // 4. Transom (port corner to starboard corner)
+  
+  interface LipPoint {
+    x: number;
+    y: number;
+    z: number;
+    nx: number;  // Outward normal X
+    nz: number;  // Outward normal Z
+  }
+  
+  const perimeterPoints: LipPoint[] = [];
+  
+  // Port side (u goes 0 to 1, stern to bow)
+  for (let i = 0; i <= Nu; i++) {
+    const u = i / Nu;
+    const x = (u - 0.5) * length;
+    const halfBeam = evalBeamV2(u, params);
+    const yDeck = evalDeckV2(u, params);
+    const lipInset = overhang * 0.7;
+    
+    perimeterPoints.push({
+      x,
+      y: yDeck,
+      z: -(halfBeam - lipInset),  // Port side (negative Z)
+      nx: 0,
+      nz: -1,  // Normal pointing outward (port)
+    });
+  }
+  
+  // Starboard side (u goes 1 to 0, bow to stern)
+  for (let i = Nu; i >= 0; i--) {
+    const u = i / Nu;
+    const x = (u - 0.5) * length;
+    const halfBeam = evalBeamV2(u, params);
+    const yDeck = evalDeckV2(u, params);
+    const lipInset = overhang * 0.7;
+    
+    perimeterPoints.push({
+      x,
+      y: yDeck,
+      z: (halfBeam - lipInset),  // Starboard side (positive Z)
+      nx: 0,
+      nz: 1,  // Normal pointing outward (starboard)
+    });
+  }
+  
+  // Transom edge (connects starboard stern corner back to port stern corner)
+  const transomSamples = Math.floor(Nu / 4);
+  const sternHalfBeam = evalBeamV2(0, params);
+  const sternY = evalDeckV2(0, params);
+  const sternX = -length / 2;
+  const lipInset = overhang * 0.7;
+  
+  for (let i = 1; i < transomSamples; i++) {
+    const t = i / transomSamples;
+    const z = lerp(sternHalfBeam - lipInset, -(sternHalfBeam - lipInset), t);
+    
+    perimeterPoints.push({
+      x: sternX,
+      y: sternY,
+      z,
+      nx: -1,  // Normal pointing aft
+      nz: 0,
+    });
+  }
+  
+  const totalPerimeterPoints = perimeterPoints.length;
+  
+  // Generate lip profile for each perimeter point
+  for (let pi = 0; pi < totalPerimeterPoints; pi++) {
+    const pt = perimeterPoints[pi];
+    
+    // Determine corner sharpness based on position
+    let cornerSharpness = 0.5;
+    if (pt.nx < -0.5) {
+      // Transom edge - use transom sharpness
+      cornerSharpness = params.lip.transomUpperSharpness;
+    }
+    
+    for (let j = 0; j <= lipSamples; j++) {
+      const t = j / lipSamples;
       
-      const halfBeam = evalBeamV2(u, params);
-      const yDeck = evalDeckV2(u, params);
-      const deckCrown = evalDeckCrownV2(u, params);
+      // Lip follows arc from top to underside
+      const angle = t * Math.PI * (0.4 + 0.1 * cornerSharpness);
       
-      // Lip attachment point matches deck edge
-      const lipInset = overhang * 0.7;
-      const attachZ = side * (halfBeam - lipInset);
-      const attachY = yDeck;
+      // Offset in the outward normal direction
+      const lipOffsetH = overhang * Math.sin(angle);  // Horizontal outward
+      const lipOffsetY = -drop * (1 - Math.cos(angle));  // Vertical down
       
-      // Transom corner sharpness - more squared at stern
-      const cornerSharpness = u < 0.1 
-        ? lerp(params.lip.transomUpperSharpness, 0.5, smoothstep(0, 0.1, u))
-        : 0.5;
+      // Tuck effect
+      const tuckT = t * t * (3 - 2 * t);
+      const tuckY = -drop * tuckT * tuckSharpness;
       
-      // Generate lip profile points
-      for (let j = 0; j <= lipSamples; j++) {
-        const t = j / lipSamples;
-        
-        // Lip follows arc from top to underside with variable sharpness
-        const angle = t * Math.PI * (0.4 + 0.1 * cornerSharpness);
-        const lipOffsetZ = side * overhang * Math.sin(angle);
-        const lipOffsetY = -drop * (1 - Math.cos(angle));
-        
-        // Add tuck sharpness effect
-        const tuckT = t * t * (3 - 2 * t);
-        const tuckY = -drop * tuckT * tuckSharpness;
-        
-        const z = attachZ + lipOffsetZ;
-        const y = attachY + lipOffsetY + tuckY;
-        
-        positions.push(x, y, z);
-        
-        // Normal calculation
-        const nx = 0;
-        const ny = Math.cos(angle) * 0.5;
-        const nz = side * Math.sin(angle);
-        const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-        normals.push(nx / nLen, ny / nLen, nz / nLen);
-        
-        uvs.push(u, t);
-      }
+      const x = pt.x + pt.nx * lipOffsetH;
+      const y = pt.y + lipOffsetY + tuckY;
+      const z = pt.z + pt.nz * lipOffsetH;
+      
+      positions.push(x, y, z);
+      
+      // Normal calculation - blend between outward and downward
+      const outwardFactor = Math.sin(angle);
+      const downFactor = Math.cos(angle) * 0.5;
+      const nx = pt.nx * outwardFactor;
+      const ny = downFactor;
+      const nz = pt.nz * outwardFactor;
+      const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      normals.push(nx / nLen, ny / nLen, nz / nLen);
+      
+      uvs.push(pi / totalPerimeterPoints, t);
     }
   }
   
-  // Generate indices for each side
-  const vertsPerSide = (Nu + 1) * (lipSamples + 1);
-  
-  for (let sideOffset = 0; sideOffset < 2; sideOffset++) {
-    const base = sideOffset * vertsPerSide;
-    const flip = sideOffset === 0;
+  // Generate indices - wrap around the perimeter
+  for (let pi = 0; pi < totalPerimeterPoints; pi++) {
+    const nextPi = (pi + 1) % totalPerimeterPoints;
     
-    for (let i = 0; i < Nu; i++) {
-      for (let j = 0; j < lipSamples; j++) {
-        const a = base + i * (lipSamples + 1) + j;
-        const b = base + (i + 1) * (lipSamples + 1) + j;
-        const c = base + (i + 1) * (lipSamples + 1) + j + 1;
-        const d = base + i * (lipSamples + 1) + j + 1;
-        
-        if (flip) {
-          indices.push(a, c, b);
-          indices.push(a, d, c);
-        } else {
-          indices.push(a, b, c);
-          indices.push(a, c, d);
-        }
-      }
+    for (let j = 0; j < lipSamples; j++) {
+      const a = pi * (lipSamples + 1) + j;
+      const b = nextPi * (lipSamples + 1) + j;
+      const c = nextPi * (lipSamples + 1) + j + 1;
+      const d = pi * (lipSamples + 1) + j + 1;
+      
+      indices.push(a, b, c);
+      indices.push(a, c, d);
     }
   }
   

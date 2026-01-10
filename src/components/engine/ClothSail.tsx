@@ -363,32 +363,57 @@ export function ClothSail({
     return { x, y, pointIndices: windowPointIndices };
   }, [rigging.sail.window.position, luffLength, footLength, windowPointIndices]);
 
-  // Dynamic batten and window positions that follow the cloth
+  // Dynamic batten and window that follow the cloth surface exactly
   const BattenMesh = ({ batten, index }: { batten: typeof battenMeshes[0], index: number }) => {
     const meshRef = useRef<THREE.Mesh>(null);
+    const tempVec = useRef(new THREE.Vector3());
+    const tempQuat = useRef(new THREE.Quaternion());
     
     useFrame(() => {
-      if (!meshRef.current || batten.pointIndices.length === 0 || pointsRef.current.length === 0) return;
+      if (!meshRef.current || batten.pointIndices.length < 2 || pointsRef.current.length === 0) return;
       
-      // Get average position of batten points
+      const pts = pointsRef.current;
+      const indices = batten.pointIndices;
+      
+      // Get positions of batten points
       let avgX = 0, avgY = 0, avgZ = 0;
       let count = 0;
-      batten.pointIndices.forEach(idx => {
-        if (pointsRef.current[idx]) {
-          avgX += pointsRef.current[idx].position.x;
-          avgY += pointsRef.current[idx].position.y;
-          avgZ += pointsRef.current[idx].position.z;
+      
+      indices.forEach(idx => {
+        if (pts[idx]) {
+          avgX += pts[idx].position.x;
+          avgY += pts[idx].position.y;
+          avgZ += pts[idx].position.z;
           count++;
         }
       });
       
       if (count > 0) {
-        meshRef.current.position.set(avgX / count, avgY / count, avgZ / count + 0.01);
+        // Set position
+        meshRef.current.position.set(avgX / count, avgY / count, avgZ / count + 0.005);
+        
+        // Calculate orientation from first and last batten points
+        const firstPt = pts[indices[0]];
+        const lastPt = pts[indices[indices.length - 1]];
+        
+        if (firstPt && lastPt) {
+          // Direction along batten
+          const dir = tempVec.current.subVectors(lastPt.position, firstPt.position).normalize();
+          
+          // Calculate rotation to align batten with this direction
+          // Batten's default orientation is along X axis
+          const up = new THREE.Vector3(0, 1, 0);
+          const right = new THREE.Vector3().crossVectors(up, dir).normalize();
+          const adjustedUp = new THREE.Vector3().crossVectors(dir, right);
+          
+          const rotMatrix = new THREE.Matrix4().makeBasis(dir, adjustedUp, right);
+          meshRef.current.quaternion.setFromRotationMatrix(rotMatrix);
+        }
       }
     });
     
     return (
-      <mesh ref={meshRef} position={[batten.x, batten.y, 0.01]}>
+      <mesh ref={meshRef} position={[batten.x, batten.y, 0.005]}>
         <boxGeometry args={[batten.length, 0.018, 0.004]} />
         <meshStandardMaterial color="#444444" roughness={0.5} />
       </mesh>
@@ -397,29 +422,53 @@ export function ClothSail({
   
   const WindowMesh = () => {
     const meshRef = useRef<THREE.Mesh>(null);
+    const tempNormal = useRef(new THREE.Vector3());
     
     useFrame(() => {
-      if (!meshRef.current || windowPos.pointIndices.length === 0 || pointsRef.current.length === 0) return;
+      if (!meshRef.current || windowPos.pointIndices.length < 3 || pointsRef.current.length === 0) return;
+      
+      const pts = pointsRef.current;
+      const indices = windowPos.pointIndices;
       
       // Get average position of window points
       let avgX = 0, avgY = 0, avgZ = 0;
       let count = 0;
-      windowPos.pointIndices.forEach(idx => {
-        if (pointsRef.current[idx]) {
-          avgX += pointsRef.current[idx].position.x;
-          avgY += pointsRef.current[idx].position.y;
-          avgZ += pointsRef.current[idx].position.z;
+      
+      indices.forEach(idx => {
+        if (pts[idx]) {
+          avgX += pts[idx].position.x;
+          avgY += pts[idx].position.y;
+          avgZ += pts[idx].position.z;
           count++;
         }
       });
       
       if (count > 0) {
-        meshRef.current.position.set(avgX / count, avgY / count, avgZ / count + 0.02);
+        meshRef.current.position.set(avgX / count, avgY / count, avgZ / count);
+        
+        // Calculate surface normal from window points
+        // Use first 3 non-collinear points to compute normal
+        if (indices.length >= 3) {
+          const p0 = pts[indices[0]]?.position;
+          const p1 = pts[indices[Math.floor(indices.length / 2)]]?.position;
+          const p2 = pts[indices[indices.length - 1]]?.position;
+          
+          if (p0 && p1 && p2) {
+            const v1 = new THREE.Vector3().subVectors(p1, p0);
+            const v2 = new THREE.Vector3().subVectors(p2, p0);
+            const normal = tempNormal.current.crossVectors(v1, v2).normalize();
+            
+            // Orient the plane to face along the normal
+            const defaultNormal = new THREE.Vector3(0, 0, 1);
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(defaultNormal, normal);
+            meshRef.current.quaternion.copy(quaternion);
+          }
+        }
       }
     });
     
     return (
-      <mesh ref={meshRef} position={[windowPos.x, windowPos.y, 0.02]}>
+      <mesh ref={meshRef} position={[windowPos.x, windowPos.y, 0]}>
         <planeGeometry args={[rigging.sail.window.size.width, rigging.sail.window.size.height]} />
         <meshStandardMaterial
           color="#99ccff"
