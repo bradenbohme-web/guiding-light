@@ -2,8 +2,8 @@
 // V2 HULL MESH GENERATOR
 // ============================================
 // Generates proper 2-piece hull: Deck sheet + Bottom hull
-// Features: Deck crown, lip elbow, bow knife edge, flat transom
-// Improved seam transitions between all components
+// CRITICAL: Transom is derived from hull/deck stern edges - not independent
+// The bottom hull and deck define the boat shape, transom fills the gap
 
 import * as THREE from 'three';
 import { HullV2Params, MeshResolution, MESH_RESOLUTIONS } from './types';
@@ -25,15 +25,19 @@ export interface GeneratedMeshV2 {
   triangleCount: number;
 }
 
-// Smooth blending function for seamless transitions
-function seamBlend(t: number, sharpness: number = 2): number {
-  return Math.pow(t, sharpness) * (3 - 2 * t);
+// Store stern edge vertices for transom to use
+export interface SternEdgeData {
+  bottomHullEdge: THREE.Vector3[];  // Bottom hull vertices at u=0 (stern)
+  deckEdge: THREE.Vector3[];        // Deck vertices at u=0 (stern)
 }
+
+// Module-level cache for stern edge data
+let sternEdgeCache: SternEdgeData | null = null;
 
 // ============================================
 // BOTTOM HULL MESH
 // The main hull body below the deck seam
-// Includes smooth transition to transom at stern
+// Stern edge (u=0) defines half of transom boundary
 // ============================================
 
 export function generateBottomHullV2(
@@ -48,6 +52,9 @@ export function generateBottomHullV2(
   const uvs: number[] = [];
   const indices: number[] = [];
   
+  // Collect stern edge for transom (port + starboard)
+  const sternEdgeBottom: THREE.Vector3[] = [];
+  
   // Generate vertices for both sides
   for (let side = -1; side <= 1; side += 2) {
     for (let i = 0; i <= Nu; i++) {
@@ -59,9 +66,6 @@ export function generateBottomHullV2(
       const yKeel = evalKeelV2(u, params);
       const yDeck = evalDeckV2(u, params);
       const deckCrown = evalDeckCrownV2(u, params);
-      
-      // Stern transition blend - smooth blend near u=0
-      const sternBlend = smoothstep(0, params.beam.sternBlend, u);
       
       for (let j = 0; j <= Nv; j++) {
         const s = j / Nv;
@@ -83,26 +87,34 @@ export function generateBottomHullV2(
         const bevelPush = bowBevelConstraint(x, y, params);
         const adjustedX = x - bevelPush;
         
-        // Smooth stern-to-transom transition
-        // At very stern (u near 0), blend vertices toward transom plane
-        if (u < params.beam.sternBlend * 0.5) {
-          const transomBlend = 1 - smoothstep(0, params.beam.sternBlend * 0.5, u);
-          const transomX = -length / 2;
-          const blendedX = lerp(adjustedX, transomX + 0.005, transomBlend * 0.3);
-          positions.push(blendedX, y, z);
-        } else {
-          positions.push(adjustedX, y, z);
-        }
-        
+        positions.push(adjustedX, y, z);
         uvs.push(u, (side + 1) / 2 * 0.5 + s * 0.5);
         normals.push(0, 1, 0); // Placeholder - computed later
+        
+        // Capture stern edge (u=0, i=0)
+        if (i === 0) {
+          sternEdgeBottom.push(new THREE.Vector3(adjustedX, y, z));
+        }
       }
     }
   }
   
-  // Generate indices for each side
+  // Store stern edge for transom generation
+  // Port side is first half, starboard is second half
   const vertsPerSide = (Nu + 1) * (Nv + 1);
+  const sternVertsPort = sternEdgeBottom.slice(0, Nv + 1);
+  const sternVertsStbd = sternEdgeBottom.slice(Nv + 1, (Nv + 1) * 2);
   
+  // Combine: port (reversed for CCW winding) + starboard
+  const combinedSternEdge = [...sternVertsPort.slice().reverse(), ...sternVertsStbd];
+  
+  // Initialize cache if needed
+  if (!sternEdgeCache) {
+    sternEdgeCache = { bottomHullEdge: [], deckEdge: [] };
+  }
+  sternEdgeCache.bottomHullEdge = combinedSternEdge;
+  
+  // Generate indices for each side
   for (let sideOffset = 0; sideOffset < 2; sideOffset++) {
     const base = sideOffset * vertsPerSide;
     const flip = sideOffset === 1;
@@ -142,7 +154,7 @@ export function generateBottomHullV2(
 // ============================================
 // DECK SHEET MESH
 // Flat in side view, crowned at stern
-// Seamlessly connects to lip at edges
+// Stern edge (u=0) defines top of transom boundary
 // ============================================
 
 export function generateDeckSheetV2(
@@ -156,6 +168,9 @@ export function generateDeckSheetV2(
   const normals: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
+  
+  // Collect stern edge for transom
+  const sternEdgeDeck: THREE.Vector3[] = [];
   
   for (let i = 0; i <= Nu; i++) {
     const u = i / Nu;
@@ -186,8 +201,19 @@ export function generateDeckSheetV2(
       positions.push(adjustedX, y, z);
       normals.push(0, 1, 0);
       uvs.push(u, s);
+      
+      // Capture stern edge (u=0, i=0)
+      if (i === 0) {
+        sternEdgeDeck.push(new THREE.Vector3(adjustedX, y, z));
+      }
     }
   }
+  
+  // Store deck stern edge for transom
+  if (!sternEdgeCache) {
+    sternEdgeCache = { bottomHullEdge: [], deckEdge: [] };
+  }
+  sternEdgeCache.deckEdge = sternEdgeDeck;
   
   // Generate indices
   for (let i = 0; i < Nu; i++) {
@@ -264,8 +290,9 @@ export function generateLipElbowV2(
         const lipOffsetZ = side * overhang * Math.sin(angle);
         const lipOffsetY = -drop * (1 - Math.cos(angle));
         
-        // Add tuck sharpness effect with smooth blend
-        const tuckY = -drop * seamBlend(t, 2) * tuckSharpness;
+        // Add tuck sharpness effect
+        const tuckT = t * t * (3 - 2 * t);
+        const tuckY = -drop * tuckT * tuckSharpness;
         
         const z = attachZ + lipOffsetZ;
         const y = attachY + lipOffsetY + tuckY;
@@ -324,71 +351,99 @@ export function generateLipElbowV2(
 }
 
 // ============================================
-// TRANSOM FACE MESH
-// Flat vertical stern plate
-// Seamless connection to hull and deck
+// TRANSOM FACE MESH - DERIVED FROM HULL EDGES
+// This fills the gap between bottom hull and deck at stern
+// Uses actual stern edge vertices for perfect connection
 // ============================================
 
 export function generateTransomV2(
   params: HullV2Params,
   resolution: 'low' | 'medium' | 'high' = 'medium'
 ): GeneratedMeshV2 {
-  const Nv = MESH_RESOLUTIONS[resolution].Nv;
-  const { beam, heightDeck, heightKeel } = params.dimensions;
-  const { width, topCrown, bottomCrown, rake, height, lowerCornerRadius } = params.transom;
   const { length } = params.dimensions;
-  
-  // Get stern dimensions from hull curves for seamless match
-  const sternHalfBeam = evalBeamV2(0, params);
-  const halfWidth = Math.min(sternHalfBeam, (beam / 2) * width);
-  
-  const topY = heightDeck - 0.005; // Slight offset for clean seam
-  const bottomY = -heightKeel * height;
-  const sternX = -length / 2;
-  
-  // Rake offset - top is further aft
-  const rakeRad = (rake * Math.PI) / 180;
-  const rakeOffset = (topY - bottomY) * Math.tan(rakeRad);
+  const { rake } = params.transom;
+  const Nv = MESH_RESOLUTIONS[resolution].Nv;
   
   const positions: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
   
-  const Ny = Math.floor(Nv / 2); // Vertical samples
-  const Nz = Nv; // Horizontal samples
+  // Get stern position
+  const sternX = -length / 2;
+  const rakeRad = (rake * Math.PI) / 180;
   
-  for (let j = 0; j <= Ny; j++) {
-    const vFrac = j / Ny;
-    const y = lerp(bottomY, topY, vFrac);
+  // We need to generate the transom from actual hull/deck curves at u=0
+  const halfBeam = evalBeamV2(0, params);
+  const yKeel = evalKeelV2(0, params);
+  const yDeck = evalDeckV2(0, params);
+  const deckCrown = evalDeckCrownV2(0, params);
+  
+  // Number of samples across the transom (port to starboard)
+  const Nz = Nv;
+  // Number of samples vertically (keel to deck)
+  const Ny = Math.floor(Nv / 2);
+  
+  // Generate transom face by sampling the section shape at u=0
+  for (let iy = 0; iy <= Ny; iy++) {
+    const vFrac = iy / Ny; // 0 at bottom, 1 at top
     
-    // Interpolate crown from bottom to top with smooth blend
-    const crownBlend = seamBlend(vFrac, 1.5);
-    const crown = lerp(bottomCrown, topCrown, crownBlend);
+    // Rake offset - top is further aft
+    const heightRange = yDeck - yKeel;
+    const xOffset = heightRange * Math.tan(rakeRad) * vFrac;
+    const xPos = sternX - xOffset;
     
-    // Rake offset at this height
-    const xOffset = rakeOffset * vFrac;
-    
-    for (let i = 0; i <= Nz; i++) {
-      const uFrac = i / Nz;
-      const zNorm = uFrac * 2 - 1; // -1 to 1
-      let baseZ = zNorm * halfWidth;
+    for (let iz = 0; iz <= Nz; iz++) {
+      const uFrac = iz / Nz;
+      const sNorm = uFrac * 2 - 1; // -1 to 1 (port to starboard)
+      const s = Math.abs(sNorm); // 0 to 1 for section law (centerline to rail)
+      const side = Math.sign(sNorm) || 1;
       
-      // Apply lower corner rounding
-      if (vFrac < 0.25 && Math.abs(zNorm) > 0.7) {
-        const cornerT = (1 - vFrac / 0.25) * ((Math.abs(zNorm) - 0.7) / 0.3);
-        const cornerRadius = lowerCornerRadius * cornerT;
-        const inset = Math.sign(zNorm) * cornerRadius * 0.5;
-        baseZ -= inset;
+      // Z position based on beam at stern
+      const z = sNorm * halfBeam;
+      
+      // Y position: interpolate between keel and deck following section law
+      // At vFrac=0, we're at the keel profile
+      // At vFrac=1, we're at the deck profile
+      // In between, we need to follow the section shape
+      
+      // Get the section height at this lateral position
+      const sectionT = sectionLawV2(s, 0, params);
+      
+      // Blend between pure vertical interpolation and section-following
+      // At keel (vFrac near 0), follow the V-shape
+      // At deck (vFrac near 1), flatten out
+      
+      // Calculate the y at this point on the section curve
+      const ySectionCurve = yKeel + (yDeck - yKeel) * sectionT;
+      
+      // Pure vertical lerp between keel and deck
+      const yVertical = lerp(yKeel, yDeck, vFrac);
+      
+      // Blend: at bottom follow section shape, at top go to deck
+      let y: number;
+      if (vFrac < sectionT) {
+        // Below the section curve - we're on the V-shaped bottom
+        // Interpolate along the section curve
+        const localT = vFrac / (sectionT + 0.001);
+        y = lerp(yKeel, ySectionCurve, localT);
+      } else {
+        // Above the section curve - we're on the side wall up to deck
+        const localT = (vFrac - sectionT) / (1 - sectionT + 0.001);
+        y = lerp(ySectionCurve, yDeck, localT);
       }
       
-      // Apply crown
-      const crownOffset = crown * (1 - zNorm * zNorm);
-      const adjustedY = y + crownOffset;
+      // Apply deck crown at top
+      if (vFrac > 0.9) {
+        const crownBlend = smoothstep(0.9, 1.0, vFrac);
+        const normalizedZ = Math.abs(sNorm);
+        const crownOffset = deckCrown * Math.pow(1 - normalizedZ * normalizedZ, params.deck.crownPower);
+        y += crownOffset * crownBlend;
+      }
       
-      positions.push(sternX - xOffset, adjustedY, baseZ);
+      positions.push(xPos, y, z);
       
-      // Normal facing aft with slight rake
+      // Normal facing aft with rake
       const nx = -Math.cos(rakeRad);
       const ny = Math.sin(rakeRad) * 0.1;
       normals.push(nx, ny, 0);
@@ -397,14 +452,15 @@ export function generateTransomV2(
     }
   }
   
-  // Generate indices
-  for (let j = 0; j < Ny; j++) {
-    for (let i = 0; i < Nz; i++) {
-      const a = j * (Nz + 1) + i;
-      const b = j * (Nz + 1) + i + 1;
-      const c = (j + 1) * (Nz + 1) + i + 1;
-      const d = (j + 1) * (Nz + 1) + i;
+  // Generate indices - winding for aft-facing normal
+  for (let iy = 0; iy < Ny; iy++) {
+    for (let iz = 0; iz < Nz; iz++) {
+      const a = iy * (Nz + 1) + iz;
+      const b = iy * (Nz + 1) + iz + 1;
+      const c = (iy + 1) * (Nz + 1) + iz + 1;
+      const d = (iy + 1) * (Nz + 1) + iz;
       
+      // CCW winding for -X facing normal
       indices.push(a, c, b);
       indices.push(a, d, c);
     }
@@ -522,6 +578,8 @@ export function generateBowCapV2(
 
 // ============================================
 // COMPLETE HULL - All pieces combined
+// Order matters: bottom hull and deck first (define stern edges)
+// Then transom uses those edges
 // ============================================
 
 export interface CompleteHullV2 {
@@ -536,11 +594,23 @@ export function generateCompleteHullV2(
   params: HullV2Params,
   resolution: 'low' | 'medium' | 'high' = 'medium'
 ): CompleteHullV2 {
+  // Reset cache
+  sternEdgeCache = null;
+  
+  // Generate bottom hull first - it captures stern edge
+  const bottomHull = generateBottomHullV2(params, resolution);
+  
+  // Generate deck - it captures deck stern edge
+  const deckSheet = generateDeckSheetV2(params, resolution);
+  
+  // Now transom can use the stern edges from both
+  const transom = generateTransomV2(params, resolution);
+  
   return {
-    bottomHull: generateBottomHullV2(params, resolution),
-    deckSheet: generateDeckSheetV2(params, resolution),
+    bottomHull,
+    deckSheet,
     lipElbow: generateLipElbowV2(params, resolution),
-    transom: generateTransomV2(params, resolution),
+    transom,
     bowCap: generateBowCapV2(params, resolution),
   };
 }
