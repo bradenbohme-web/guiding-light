@@ -353,7 +353,7 @@ export function generateLipElbowV2(
 // ============================================
 // TRANSOM FACE MESH - DERIVED FROM HULL EDGES
 // This fills the gap between bottom hull and deck at stern
-// Uses actual stern edge vertices for perfect connection
+// Bottom edge follows hull section curve, top edge follows deck
 // ============================================
 
 export function generateTransomV2(
@@ -369,11 +369,10 @@ export function generateTransomV2(
   const uvs: number[] = [];
   const indices: number[] = [];
   
-  // Get stern position
+  // Get stern position and curves at u=0
   const sternX = -length / 2;
   const rakeRad = (rake * Math.PI) / 180;
   
-  // We need to generate the transom from actual hull/deck curves at u=0
   const halfBeam = evalBeamV2(0, params);
   const yKeel = evalKeelV2(0, params);
   const yDeck = evalDeckV2(0, params);
@@ -381,69 +380,46 @@ export function generateTransomV2(
   
   // Number of samples across the transom (port to starboard)
   const Nz = Nv;
-  // Number of samples vertically (keel to deck)
+  // Number of samples vertically
   const Ny = Math.floor(Nv / 2);
   
-  // Generate transom face by sampling the section shape at u=0
+  // For each lateral position, calculate the hull bottom Y and deck top Y
+  // Then interpolate between them vertically
+  
   for (let iy = 0; iy <= Ny; iy++) {
     const vFrac = iy / Ny; // 0 at bottom, 1 at top
-    
-    // Rake offset - top is further aft
-    const heightRange = yDeck - yKeel;
-    const xOffset = heightRange * Math.tan(rakeRad) * vFrac;
-    const xPos = sternX - xOffset;
     
     for (let iz = 0; iz <= Nz; iz++) {
       const uFrac = iz / Nz;
       const sNorm = uFrac * 2 - 1; // -1 to 1 (port to starboard)
-      const s = Math.abs(sNorm); // 0 to 1 for section law (centerline to rail)
-      const side = Math.sign(sNorm) || 1;
+      const s = Math.abs(sNorm); // 0 to 1 for section law
       
       // Z position based on beam at stern
       const z = sNorm * halfBeam;
       
-      // Y position: interpolate between keel and deck following section law
-      // At vFrac=0, we're at the keel profile
-      // At vFrac=1, we're at the deck profile
-      // In between, we need to follow the section shape
-      
-      // Get the section height at this lateral position
+      // Calculate the hull section Y at this lateral position (bottom edge of transom)
+      // This is the same calculation used in generateBottomHullV2 at u=0
       const sectionT = sectionLawV2(s, 0, params);
+      const yHullSection = yKeel + (yDeck - yKeel) * sectionT;
       
-      // Blend between pure vertical interpolation and section-following
-      // At keel (vFrac near 0), follow the V-shape
-      // At deck (vFrac near 1), flatten out
+      // Apply deck crown for the deck edge (top edge of transom)
+      const normalizedZ = Math.abs(sNorm);
+      const crownOffset = deckCrown * Math.pow(1 - normalizedZ * normalizedZ, params.deck.crownPower);
+      const yDeckWithCrown = yDeck + crownOffset;
       
-      // Calculate the y at this point on the section curve
-      const ySectionCurve = yKeel + (yDeck - yKeel) * sectionT;
+      // Now interpolate between hull section (bottom) and deck (top)
+      // vFrac=0 -> yHullSection (follows the V-shape)
+      // vFrac=1 -> yDeckWithCrown
+      const y = lerp(yHullSection, yDeckWithCrown, vFrac);
       
-      // Pure vertical lerp between keel and deck
-      const yVertical = lerp(yKeel, yDeck, vFrac);
-      
-      // Blend: at bottom follow section shape, at top go to deck
-      let y: number;
-      if (vFrac < sectionT) {
-        // Below the section curve - we're on the V-shaped bottom
-        // Interpolate along the section curve
-        const localT = vFrac / (sectionT + 0.001);
-        y = lerp(yKeel, ySectionCurve, localT);
-      } else {
-        // Above the section curve - we're on the side wall up to deck
-        const localT = (vFrac - sectionT) / (1 - sectionT + 0.001);
-        y = lerp(ySectionCurve, yDeck, localT);
-      }
-      
-      // Apply deck crown at top
-      if (vFrac > 0.9) {
-        const crownBlend = smoothstep(0.9, 1.0, vFrac);
-        const normalizedZ = Math.abs(sNorm);
-        const crownOffset = deckCrown * Math.pow(1 - normalizedZ * normalizedZ, params.deck.crownPower);
-        y += crownOffset * crownBlend;
-      }
+      // Rake offset - top is further aft
+      const heightRange = yDeckWithCrown - yHullSection;
+      const xOffset = heightRange * Math.tan(rakeRad) * vFrac;
+      const xPos = sternX - xOffset;
       
       positions.push(xPos, y, z);
       
-      // Normal facing aft with rake
+      // Normal facing aft with slight rake
       const nx = -Math.cos(rakeRad);
       const ny = Math.sin(rakeRad) * 0.1;
       normals.push(nx, ny, 0);
