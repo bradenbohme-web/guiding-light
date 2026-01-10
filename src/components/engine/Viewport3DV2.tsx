@@ -124,13 +124,17 @@ export function Viewport3DV2({
           highlightTarget={highlightTarget}
         />
 
-        {/* Controls */}
+        {/* Controls - full freedom of movement */}
         <OrbitControls
           enableDamping
           dampingFactor={0.05}
-          minDistance={2}
-          maxDistance={20}
-          maxPolarAngle={Math.PI * 0.85}
+          minDistance={0.5}
+          maxDistance={100}
+          minPolarAngle={0}
+          maxPolarAngle={Math.PI}
+          enablePan={true}
+          panSpeed={1}
+          rotateSpeed={1}
         />
 
         {/* Gizmo */}
