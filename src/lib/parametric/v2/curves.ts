@@ -148,45 +148,38 @@ export function sectionLawV2(
 }
 
 // ============================================
-// BOW KNIFE EDGE - Bevel plane constraint
-// Returns how much to push the surface back
+// BOW CONVERGENCE - Simplified 2-stage taper
+// 1. Shoulder fade – hull width eases toward knife region
+// 2. Knife edge – aggressive pinch controlled by params.bow.angle
+// Returns how much to push the surface back (positive = aft)
 // ============================================
 
 export function bowBevelConstraint(
-  x: number, 
-  y: number, 
+  x: number,
+  _y: number,
   params: HullV2Params
 ): number {
   const { length } = params.dimensions;
   const { edgeLength, angle, shoulderBlend } = params.bow;
-  
-  const bowX = length / 2;
-  const angleRad = (angle * Math.PI) / 180;
-  
-  // Only affects bow region
-  const blendStart = bowX - shoulderBlend;
+
+  const bowX = length / 2; // furthest forward point
+  const blendStart = bowX - shoulderBlend - edgeLength;
   if (x < blendStart) return 0;
-  
-  // The knife edge is a line from keel to deck at ~45°
-  // Points below the line get pushed back
-  const keelY = evalKeelV2(1, params);
-  const deckY = evalDeckV2(1, params);
-  
-  // Knife edge runs from (bowX, keelY) to (bowX - edgeLength * cos(angle), deckY)
-  const knifeBaseX = bowX;
-  const knifeTopX = bowX - edgeLength * Math.cos(angleRad);
-  
-  // Linear interpolation along knife edge
-  const heightFrac = (y - keelY) / (deckY - keelY);
-  const knifeX = lerp(knifeBaseX, knifeTopX, clamp(heightFrac, 0, 1));
-  
-  // How much to push back if past knife edge
-  if (x > knifeX) {
-    const blend = smoothstep(blendStart, bowX - edgeLength, x);
-    return (x - knifeX) * blend;
-  }
-  
-  return 0;
+
+  // Inside the transition band
+  const totalZone = shoulderBlend + edgeLength;
+  const distFromBow = bowX - x;
+
+  // Normalized 0 (bow) to 1 (shoulder start)
+  const t = clamp(distFromBow / totalZone, 0, 1);
+
+  // Convergence profile: sharper at bow (angle controls steepness)
+  // Use inverse smoothstep so knife portion tapers faster.
+  const angleRad = (angle * Math.PI) / 180;
+  const taperCurve = Math.pow(1 - t, 1 + Math.tan(angleRad) * 0.5);
+
+  // Maximum push-back is capped to edgeLength
+  return edgeLength * (1 - taperCurve);
 }
 
 // ============================================
