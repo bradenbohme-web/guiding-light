@@ -160,83 +160,100 @@ function ParamSlider({ label, value, min, max, step, unit, onChange, hoverTarget
   );
 }
 
-// Position control (X, Y, Z sliders)
+// Position control with ARROW BUTTONS (no limits) + optional lock
 interface PositionControlProps {
   label: string;
   position: THREE.Vector3;
   onChange: (pos: THREE.Vector3) => void;
   hoverTarget?: string;
   onHoverTargetChange?: (target: string | null) => void;
-  ranges?: { x: [number, number]; y: [number, number]; z: [number, number] };
+  step?: number;
+  locked?: boolean;
+  onLockedChange?: (locked: boolean) => void;
 }
 
-function PositionControl({ label, position, onChange, hoverTarget, onHoverTargetChange, ranges }: PositionControlProps) {
-  const defaultRange: [number, number] = [-3, 3];
-  const xRange = ranges?.x ?? defaultRange;
-  const yRange = ranges?.y ?? [-1, 2];
-  const zRange = ranges?.z ?? [-1, 1];
-  
+function PositionControl({
+  label,
+  position,
+  onChange,
+  hoverTarget,
+  onHoverTargetChange,
+  step = 0.05,
+  locked,
+  onLockedChange,
+}: PositionControlProps) {
   const partInfo = hoverTarget ? PART_INFO[hoverTarget] : null;
-  
+
+  const nudge = (axis: 'x' | 'y' | 'z', delta: number) => {
+    if (locked) return;
+    const next = position.clone();
+    next[axis] += delta;
+    onChange(next);
+  };
+
   return (
     <TooltipProvider delayDuration={300}>
-      <div 
+      <div
         className="space-y-2 p-2 rounded bg-secondary/30 group"
         onMouseEnter={() => onHoverTargetChange?.(hoverTarget ?? null)}
         onMouseLeave={() => onHoverTargetChange?.(null)}
       >
-        <div className="flex items-center gap-2">
-          <Move className="w-3 h-3 text-muted-foreground" />
-          <Label className="text-xs font-medium group-hover:text-primary transition-colors">{label} Position</Label>
-          {partInfo && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="w-3 h-3 text-muted-foreground/50 hover:text-primary cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-xs">
-                <div className="space-y-1">
-                  <p className="font-semibold">{partInfo.name}</p>
-                  <p className="text-xs">{partInfo.description}</p>
-                  <p className="text-xs text-muted-foreground">📍 {partInfo.location}</p>
-                </div>
-              </TooltipContent>
-            </Tooltip>
+        <div className="flex items-center gap-2 justify-between">
+          <div className="flex items-center gap-1">
+            <Move className="w-3 h-3 text-muted-foreground" />
+            <Label className="text-xs font-medium group-hover:text-primary transition-colors">{label}</Label>
+            {partInfo && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3 h-3 text-muted-foreground/50 hover:text-primary cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs">
+                  <div className="space-y-1">
+                    <p className="font-semibold">{partInfo.name}</p>
+                    <p className="text-xs">{partInfo.description}</p>
+                    <p className="text-xs text-muted-foreground">📍 {partInfo.location}</p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+          {onLockedChange && (
+            <button
+              onClick={() => onLockedChange(!locked)}
+              className={`text-[10px] px-1 py-0.5 rounded border ${locked ? 'bg-destructive/30 border-destructive' : 'bg-secondary border-border'}`}
+            >
+              {locked ? '🔒' : '🔓'}
+            </button>
           )}
         </div>
+
+        {/* Axis controls */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="space-y-0.5">
-            <Label className="text-[10px] text-muted-foreground">X (fore/aft)</Label>
-            <Slider
-              value={[position.x]}
-              min={xRange[0]}
-              max={xRange[1]}
-              step={0.01}
-              onValueChange={([v]) => onChange(new THREE.Vector3(v, position.y, position.z))}
-            />
-            <span className="text-[10px] font-mono text-center block">{position.x.toFixed(2)}</span>
-          </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px] text-muted-foreground">Y (up/down)</Label>
-            <Slider
-              value={[position.y]}
-              min={yRange[0]}
-              max={yRange[1]}
-              step={0.01}
-              onValueChange={([v]) => onChange(new THREE.Vector3(position.x, v, position.z))}
-            />
-            <span className="text-[10px] font-mono text-center block">{position.y.toFixed(2)}</span>
-          </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px] text-muted-foreground">Z (port/stbd)</Label>
-            <Slider
-              value={[position.z]}
-              min={zRange[0]}
-              max={zRange[1]}
-              step={0.01}
-              onValueChange={([v]) => onChange(new THREE.Vector3(position.x, position.y, v))}
-            />
-            <span className="text-[10px] font-mono text-center block">{position.z.toFixed(2)}</span>
-          </div>
+          {(['x', 'y', 'z'] as const).map((axis) => {
+            const axisLabel = axis === 'x' ? 'X (fore/aft)' : axis === 'y' ? 'Y (up/dn)' : 'Z (p/s)';
+            return (
+              <div key={axis} className="flex flex-col items-center gap-0.5">
+                <span className="text-[9px] text-muted-foreground">{axisLabel}</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    className="w-5 h-5 flex items-center justify-center rounded bg-secondary hover:bg-primary/20 text-xs disabled:opacity-50"
+                    disabled={locked}
+                    onClick={() => nudge(axis, -step)}
+                  >
+                    −
+                  </button>
+                  <span className="text-[10px] font-mono w-10 text-center">{position[axis].toFixed(2)}</span>
+                  <button
+                    className="w-5 h-5 flex items-center justify-center rounded bg-secondary hover:bg-primary/20 text-xs disabled:opacity-50"
+                    disabled={locked}
+                    onClick={() => nudge(axis, step)}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </TooltipProvider>
@@ -488,7 +505,6 @@ export function RiggingPanel({
             onChange={(pos) => onChange({ ...rigging, mast: { ...rigging.mast, position: pos } })}
             hoverTarget="mast"
             onHoverTargetChange={onHoverTargetChange}
-            ranges={{ x: [-1, 1], y: [0, 0.5], z: [-0.5, 0.5] }}
           />
           <ParamSlider
             label="Height"
@@ -566,7 +582,6 @@ export function RiggingPanel({
             onChange={(pos) => onChange({ ...rigging, boom: { ...rigging.boom, position: pos } })}
             hoverTarget="boom"
             onHoverTargetChange={onHoverTargetChange}
-            ranges={{ x: [-0.5, 0.5], y: [0.5, 1.5], z: [-0.3, 0.3] }}
           />
           <ParamSlider
             label="Length"
@@ -835,7 +850,6 @@ export function RiggingPanel({
             onChange={(pos) => onChange({ ...rigging, centerboard: { ...rigging.centerboard, position: pos } })}
             hoverTarget="centerboard"
             onHoverTargetChange={onHoverTargetChange}
-            ranges={{ x: [-0.5, 0.5], y: [-0.2, 0.2], z: [-0.1, 0.1] }}
           />
           <ParamSlider
             label="Deployment"
@@ -917,7 +931,6 @@ export function RiggingPanel({
             })}
             hoverTarget="rudder"
             onHoverTargetChange={onHoverTargetChange}
-            ranges={{ x: [-2.5, -1.5], y: [-0.1, 0.2], z: [-0.1, 0.1] }}
           />
           <ParamSlider
             label="Chord"
@@ -1010,7 +1023,6 @@ export function RiggingPanel({
             })}
             hoverTarget="tiller"
             onHoverTargetChange={onHoverTargetChange}
-            ranges={{ x: [-0.1, 0.2], y: [-0.1, 0.1], z: [-0.1, 0.1] }}
           />
           <ParamSlider
             label="Tiller Length"
