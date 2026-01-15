@@ -1,11 +1,16 @@
 // ============================================
 // V2 HULL PARAMETRIC SYSTEM - TYPE DEFINITIONS
 // ============================================
-// Based on comprehensive design document for Laser dinghy hull
-// Two-piece fiberglass construction: Deck sheet + Bottom hull
-// Features: Proper transom, bow knife edge, deck crown, lip elbow
+// Ortho-driven design: Curves define hull shape in 2D views
+// Hull is a unified surface where bow emerges from V converging to edge
 
 // Coordinate system: X = forward (bow), Y = up, Z = starboard
+
+// ============================================
+// INTERPOLATION STYLE - Controls curve bulge
+// ============================================
+
+export type InterpolationStyle = 'balloon' | 'straight' | 'vacuum';
 
 // ============================================
 // CURVE FIELD TYPES
@@ -49,7 +54,7 @@ export function evalCurveField(curve: CurveField, t: number): number {
 }
 
 // ============================================
-// HULL V2 PARAMETERS
+// HULL V2 PARAMETERS - Simplified for ortho-driven design
 // ============================================
 
 export interface HullV2Dimensions {
@@ -60,7 +65,6 @@ export interface HullV2Dimensions {
 }
 
 export interface DeckSheetParams {
-  // Deck is flat in side view but has crown at stern
   crownAft: number;        // Crown height at stern centerline (m)
   crownFadeStart: number;  // U position where crown starts fading (0-1)
   crownFadeEnd: number;    // U position where crown is zero (0-1)
@@ -68,13 +72,11 @@ export interface DeckSheetParams {
 }
 
 export interface LipElbowParams {
-  // The 30mm finger-grip lip around deck perimeter
-  overhang: number;        // How far lip extends outboard (m) - default 0.030
+  overhang: number;        // How far lip extends outboard (m)
   drop: number;            // How far lip drops below deck (m)
   radiusTop: number;       // Rounding at top edge (m)
   radiusUnder: number;     // Rounding on underside (m)
   tuckSharpness: number;   // 0-1: how abruptly underside tucks in
-  // Corner overrides
   transomUpperSharpness: number; // 0-1: squared corners at transom top
   transomLowerRadius: number;    // Radius at transom bottom corners (m)
 }
@@ -93,32 +95,28 @@ export interface BottomHullParams {
 }
 
 export interface TransomParams {
-  // Flat vertical stern - the anchor shape
   width: number;           // 0-1: ratio of transom width to beam
   topCrown: number;        // Match deck crown at stern
   bottomCrown: number;     // Bottom edge curvature
-  upperCornerRadius: number;  // Small radius (squared feel) (m)
-  lowerCornerRadius: number;  // Quarter-cylinder radius (m)
+  upperCornerRadius: number;
+  lowerCornerRadius: number;
   rake: number;            // Transom lean angle (degrees)
   height: number;          // 0-1: ratio of hull height
 }
 
-export interface BowKnifeParams {
-  // Samurai knife edge - not a point, but a 45° edge
-  edgeLength: number;      // Length of knife edge (m) - ~0.20-0.25
-  angle: number;           // Bevel angle (degrees) - ~45
-  tipRadius: number;       // Rounding on edge (m) - never sharp
-  bullnoseRadius: number;  // Cylindrical rounding at front (m)
-  shoulderBlend: number;   // How far back blend extends (m)
-  lipOverhang: number;     // How far deck lip protrudes past stem (m)
+// SIMPLIFIED BOW PARAMS - No separate bow cap, just edge control
+export interface BowParams {
+  edgeRake: number;        // Bow edge angle in side view (degrees) - forward/back tilt
+  taperStart: number;      // U position where taper begins (0-1)
+  taperPower: number;      // How aggressively bow tapers (1=linear, 2+=aggressive)
+  knifeWidth: number;      // Minimum width at bow tip (m) - never zero
 }
 
 export interface BeamDistribution {
-  // Half-beam curve B(u)
   sternWidth: number;      // 0-1: width at transom relative to max beam
   maxBeamPos: number;      // U position of maximum beam (0-1)
-  bowTaper: number;        // How quickly bow tapers (power)
   sternBlend: number;      // Region over which stern stays wide
+  interpolation: InterpolationStyle; // How beam curve bulges
 }
 
 export interface HullV2Params {
@@ -127,7 +125,7 @@ export interface HullV2Params {
   lip: LipElbowParams;
   bottom: BottomHullParams;
   transom: TransomParams;
-  bow: BowKnifeParams;
+  bow: BowParams;
   beam: BeamDistribution;
 }
 
@@ -143,19 +141,19 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
     heightKeel: 0.15,
   },
   deck: {
-    crownAft: 0.025,       // Slight crown at stern
-    crownFadeStart: 0.0,   // Starts fading from stern
-    crownFadeEnd: 0.4,     // Flat by 40% forward
-    crownPower: 2.0,       // Parabolic crown shape
+    crownAft: 0.025,
+    crownFadeStart: 0.0,
+    crownFadeEnd: 0.4,
+    crownPower: 2.0,
   },
   lip: {
-    overhang: 0.030,       // 30mm finger grip
+    overhang: 0.030,
     drop: 0.025,
     radiusTop: 0.008,
     radiusUnder: 0.006,
     tuckSharpness: 0.6,
-    transomUpperSharpness: 0.8,  // Squared at transom top
-    transomLowerRadius: 0.015,   // Quarter-round at bottom
+    transomUpperSharpness: 0.8,
+    transomLowerRadius: 0.015,
   },
   bottom: {
     vDepth: 0.45,
@@ -168,27 +166,25 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
     forefoot: 0.03,
   },
   transom: {
-    width: 0.85,           // Wide flat transom
-    topCrown: 0.02,        // Matches deck crown
+    width: 0.85,
+    topCrown: 0.02,
     bottomCrown: 0.015,
-    upperCornerRadius: 0.005,  // Nearly square
-    lowerCornerRadius: 0.02,   // Quarter cylinder
-    rake: 8,               // Slight rake
+    upperCornerRadius: 0.005,
+    lowerCornerRadius: 0.02,
+    rake: 8,
     height: 0.85,
   },
   bow: {
-    edgeLength: 0.22,      // ~22cm knife edge
-    angle: 45,             // 45 degree bevel
-    tipRadius: 0.006,      // Rounded edge
-    bullnoseRadius: 0.010, // Cylindrical front rounding
-    shoulderBlend: 0.15,   // Blend region
-    lipOverhang: 0.012,    // Deck lip protrudes past stem
+    edgeRake: 15,          // Bow edge tilts 15° forward in side view
+    taperStart: 0.5,       // Start taper at midpoint
+    taperPower: 2.0,       // Smooth taper
+    knifeWidth: 0.02,      // 2cm knife edge width
   },
   beam: {
-    sternWidth: 0.85,      // Wide at transom
-    maxBeamPos: 0.45,      // Max beam slightly aft of center
-    bowTaper: 1.8,
+    sternWidth: 0.85,
+    maxBeamPos: 0.45,
     sternBlend: 0.15,
+    interpolation: 'straight',
   },
 };
 
@@ -202,14 +198,14 @@ export interface PartInfo {
   description: string;
   location: string;
   category: 'hull' | 'deck' | 'transom' | 'bow' | 'lip' | 'section';
-  paramKeys: string[];  // Which params affect this part
+  paramKeys: string[];
 }
 
 export const HULL_PARTS: Record<string, PartInfo> = {
   deck_sheet: {
     id: 'deck_sheet',
     name: 'Deck / Top Sheet',
-    description: 'Flat fiberglass piece forming the top surface. Flat in side view, but has gentle convex crown at stern that flattens forward.',
+    description: 'Flat fiberglass piece forming the top surface. Flat in side view, crowned at stern.',
     location: 'Entire top surface from bow to transom',
     category: 'deck',
     paramKeys: ['deck.crownAft', 'deck.crownFadeStart', 'deck.crownFadeEnd', 'deck.crownPower'],
@@ -217,7 +213,7 @@ export const HULL_PARTS: Record<string, PartInfo> = {
   bottom_hull: {
     id: 'bottom_hull',
     name: 'Bottom Hull',
-    description: 'Main hull body - V-shaped bottom with rocker. Single fiberglass piece from transom to bow knife edge.',
+    description: 'Main hull body - V-shaped bottom with rocker. Sides converge to knife edge at bow.',
     location: 'Entire hull below deck seam',
     category: 'hull',
     paramKeys: ['bottom.vDepth', 'bottom.vPower', 'bottom.chinePos', 'bottom.chineSoftness', 'bottom.rockerAmp'],
@@ -225,7 +221,7 @@ export const HULL_PARTS: Record<string, PartInfo> = {
   lip_elbow: {
     id: 'lip_elbow',
     name: 'Deck Lip / Rail',
-    description: '30mm finger-grip lip where deck meets hull. Continuous rounded 90° elbow around entire perimeter.',
+    description: '30mm finger-grip lip where deck meets hull. Continuous around entire perimeter.',
     location: 'Perimeter seam between deck and hull',
     category: 'lip',
     paramKeys: ['lip.overhang', 'lip.drop', 'lip.radiusTop', 'lip.tuckSharpness'],
@@ -233,31 +229,31 @@ export const HULL_PARTS: Record<string, PartInfo> = {
   transom_face: {
     id: 'transom_face',
     name: 'Transom',
-    description: 'Flat vertical stern plate. Top edge is gently crowned to match deck. Upper corners squared, lower corners are quarter-cylinder rounded.',
-    location: 'Aft end - WIDE and FLAT (not pointed)',
+    description: 'Flat vertical stern plate. Fills the gap where V-hull is widest at rear.',
+    location: 'Aft end - WIDE and FLAT',
     category: 'transom',
     paramKeys: ['transom.width', 'transom.rake', 'transom.upperCornerRadius', 'transom.lowerCornerRadius'],
   },
-  bow_knife: {
-    id: 'bow_knife',
-    name: 'Bow Knife Edge',
-    description: 'Samurai knife-style bow. Not a point - a ~20-25cm edge at ~45° angle. Deck lip protrudes past stem. All edges rounded (never sharp).',
-    location: 'Forward extremity of hull',
+  bow_edge: {
+    id: 'bow_edge',
+    name: 'Bow Edge',
+    description: 'Where the V-hull sides converge to a knife edge. Not a separate piece - emerges from hull shape.',
+    location: 'Forward extremity where hull sides meet',
     category: 'bow',
-    paramKeys: ['bow.edgeLength', 'bow.angle', 'bow.tipRadius', 'bow.bullnoseRadius'],
+    paramKeys: ['bow.edgeRake', 'bow.taperStart', 'bow.taperPower', 'bow.knifeWidth'],
   },
   beam_curve: {
     id: 'beam_curve',
     name: 'Beam Distribution',
-    description: 'How hull width varies from stern to bow. Wide at transom, maximum beam around midship, tapering to knife at bow.',
+    description: 'How hull width varies from stern to bow. Wide at transom, tapering to knife at bow.',
     location: 'Plan view outline',
     category: 'hull',
-    paramKeys: ['beam.sternWidth', 'beam.maxBeamPos', 'beam.bowTaper'],
+    paramKeys: ['beam.sternWidth', 'beam.maxBeamPos', 'beam.interpolation'],
   },
   section_shape: {
     id: 'section_shape',
     name: 'Section Shape',
-    description: 'Cross-sectional profile - V-hull depth, chine position, bilge roundness. Varies smoothly along length.',
+    description: 'Cross-sectional profile - V-hull depth, chine position, bilge roundness.',
     location: 'Any cross-section of hull',
     category: 'section',
     paramKeys: ['bottom.vDepth', 'bottom.deadrise', 'bottom.chinePos'],
@@ -271,7 +267,7 @@ export const HULL_PARTS: Record<string, PartInfo> = {
 export interface ParamGroupDef {
   id: string;
   name: string;
-  icon: string;  // Lucide icon name
+  icon: string;
   description: string;
   params: {
     key: string;
@@ -299,15 +295,74 @@ export const PARAM_GROUPS: ParamGroupDef[] = [
     ],
   },
   {
+    id: 'beam',
+    name: 'Plan View (Top)',
+    icon: 'MoveHorizontal',
+    description: 'Hull width distribution - editable in top ortho view',
+    params: [
+      { key: 'beam.sternWidth', label: 'Stern Width', min: 0.5, max: 1, step: 0.01, tooltip: 'Width at transom as ratio of max beam', hoverTarget: 'transom_face' },
+      { key: 'beam.maxBeamPos', label: 'Max Beam Position', min: 0.3, max: 0.6, step: 0.01, tooltip: 'U position of maximum beam (0=stern, 1=bow)', hoverTarget: 'beam_curve' },
+      { key: 'beam.sternBlend', label: 'Stern Blend Region', min: 0.05, max: 0.3, step: 0.01, tooltip: 'Length of region where stern stays wide', hoverTarget: 'transom_face' },
+    ],
+  },
+  {
+    id: 'bow',
+    name: 'Bow Convergence',
+    icon: 'Navigation',
+    description: 'How hull sides converge to knife edge',
+    params: [
+      { key: 'bow.taperStart', label: 'Taper Start', min: 0.3, max: 0.7, step: 0.01, tooltip: 'U position where bow taper begins', hoverTarget: 'bow_edge' },
+      { key: 'bow.taperPower', label: 'Taper Power', min: 1, max: 4, step: 0.1, tooltip: 'How aggressively bow tapers (1=linear, 2+=curved)', hoverTarget: 'bow_edge' },
+      { key: 'bow.knifeWidth', label: 'Knife Width', min: 0.01, max: 0.05, step: 0.005, unit: 'm', tooltip: 'Minimum width at bow tip', hoverTarget: 'bow_edge' },
+      { key: 'bow.edgeRake', label: 'Edge Rake', min: -30, max: 30, step: 1, unit: '°', tooltip: 'Bow edge angle in side view (+forward, -back)', hoverTarget: 'bow_edge' },
+    ],
+  },
+  {
+    id: 'bottom',
+    name: 'Section Shape (Front)',
+    icon: 'Ship',
+    description: 'V-hull cross-section - editable in front ortho view',
+    params: [
+      { key: 'bottom.vDepth', label: 'V-Hull Depth', min: 0, max: 1, step: 0.01, tooltip: 'How pronounced the V-shape is', hoverTarget: 'section_shape' },
+      { key: 'bottom.vPower', label: 'V-Hull Power', min: 1, max: 4, step: 0.1, tooltip: 'Exponent for V-shape curve', hoverTarget: 'section_shape' },
+      { key: 'bottom.chinePos', label: 'Chine Position', min: 0.2, max: 0.6, step: 0.01, tooltip: 'Lateral position of chine', hoverTarget: 'section_shape' },
+      { key: 'bottom.chineSoftness', label: 'Chine Softness', min: 0, max: 1, step: 0.01, tooltip: 'Blend toward rounded bilge', hoverTarget: 'section_shape' },
+      { key: 'bottom.deadrise', label: 'Deadrise', min: 0, max: 1, step: 0.01, tooltip: 'Deadrise angle factor', hoverTarget: 'section_shape' },
+    ],
+  },
+  {
+    id: 'rocker',
+    name: 'Profile (Side)',
+    icon: 'TrendingUp',
+    description: 'Keel rocker curve - editable in side ortho view',
+    params: [
+      { key: 'bottom.rockerAmp', label: 'Rocker', min: 0, max: 0.15, step: 0.005, unit: 'm', tooltip: 'Maximum keel rise at ends', hoverTarget: 'bottom_hull' },
+      { key: 'bottom.rockerPower', label: 'Rocker Power', min: 1, max: 4, step: 0.1, tooltip: 'Exponent for rocker curve', hoverTarget: 'bottom_hull' },
+      { key: 'bottom.forefoot', label: 'Forefoot Lift', min: 0, max: 0.08, step: 0.005, unit: 'm', tooltip: 'Extra bow lift at forefoot', hoverTarget: 'bow_edge' },
+    ],
+  },
+  {
     id: 'deck',
     name: 'Deck Sheet',
     icon: 'Layers',
     description: 'Top surface - flat in side view, crowned at stern',
     params: [
-      { key: 'deck.crownAft', label: 'Crown Height (Stern)', min: 0, max: 0.05, step: 0.001, unit: 'm', tooltip: 'Convex crown height at stern centerline', hoverTarget: 'deck_sheet' },
-      { key: 'deck.crownFadeStart', label: 'Crown Fade Start', min: 0, max: 0.5, step: 0.01, tooltip: 'U position where crown starts diminishing', hoverTarget: 'deck_sheet' },
-      { key: 'deck.crownFadeEnd', label: 'Crown Fade End', min: 0.2, max: 0.8, step: 0.01, tooltip: 'U position where crown is zero (flat deck)', hoverTarget: 'deck_sheet' },
-      { key: 'deck.crownPower', label: 'Crown Power', min: 1, max: 4, step: 0.1, tooltip: 'Exponent controlling crown shape: 2=parabolic', hoverTarget: 'deck_sheet' },
+      { key: 'deck.crownAft', label: 'Crown Height', min: 0, max: 0.05, step: 0.001, unit: 'm', tooltip: 'Crown height at stern centerline', hoverTarget: 'deck_sheet' },
+      { key: 'deck.crownFadeStart', label: 'Crown Fade Start', min: 0, max: 0.5, step: 0.01, tooltip: 'U where crown starts diminishing', hoverTarget: 'deck_sheet' },
+      { key: 'deck.crownFadeEnd', label: 'Crown Fade End', min: 0.2, max: 0.8, step: 0.01, tooltip: 'U where crown is zero', hoverTarget: 'deck_sheet' },
+      { key: 'deck.crownPower', label: 'Crown Power', min: 1, max: 4, step: 0.1, tooltip: 'Exponent for crown shape', hoverTarget: 'deck_sheet' },
+    ],
+  },
+  {
+    id: 'transom',
+    name: 'Transom',
+    icon: 'Square',
+    description: 'Flat stern plate - fills the rear V opening',
+    params: [
+      { key: 'transom.width', label: 'Width Ratio', min: 0.5, max: 1, step: 0.01, tooltip: 'Transom width as ratio of max beam', hoverTarget: 'transom_face' },
+      { key: 'transom.rake', label: 'Rake Angle', min: 0, max: 20, step: 0.5, unit: '°', tooltip: 'How much transom leans back', hoverTarget: 'transom_face' },
+      { key: 'transom.height', label: 'Height Ratio', min: 0.5, max: 1, step: 0.01, tooltip: 'Transom height as ratio of hull depth', hoverTarget: 'transom_face' },
+      { key: 'transom.topCrown', label: 'Top Crown', min: 0, max: 0.04, step: 0.001, unit: 'm', tooltip: 'Crown at top edge', hoverTarget: 'transom_face' },
     ],
   },
   {
@@ -316,69 +371,9 @@ export const PARAM_GROUPS: ParamGroupDef[] = [
     icon: 'Grip',
     description: '30mm finger-grip elbow around perimeter',
     params: [
-      { key: 'lip.overhang', label: 'Overhang', min: 0.010, max: 0.050, step: 0.001, unit: 'm', tooltip: 'How far lip extends outboard (30mm default)', hoverTarget: 'lip_elbow' },
-      { key: 'lip.drop', label: 'Drop', min: 0.010, max: 0.040, step: 0.001, unit: 'm', tooltip: 'How far lip drops below deck surface', hoverTarget: 'lip_elbow' },
-      { key: 'lip.radiusTop', label: 'Top Radius', min: 0.002, max: 0.015, step: 0.001, unit: 'm', tooltip: 'Rounding at visible top edge', hoverTarget: 'lip_elbow' },
-      { key: 'lip.tuckSharpness', label: 'Tuck Sharpness', min: 0, max: 1, step: 0.05, tooltip: 'How abruptly underside tucks inward', hoverTarget: 'lip_elbow' },
-      { key: 'lip.transomUpperSharpness', label: 'Transom Upper Corners', min: 0, max: 1, step: 0.05, tooltip: 'How squared the top transom corners are', hoverTarget: 'transom_face' },
-      { key: 'lip.transomLowerRadius', label: 'Transom Lower Radius', min: 0.005, max: 0.03, step: 0.001, unit: 'm', tooltip: 'Quarter-cylinder radius at transom bottom corners', hoverTarget: 'transom_face' },
-    ],
-  },
-  {
-    id: 'bottom',
-    name: 'Bottom Hull',
-    icon: 'Ship',
-    description: 'V-hull shape, rocker, and section',
-    params: [
-      { key: 'bottom.vDepth', label: 'V-Hull Depth', min: 0, max: 1, step: 0.01, tooltip: 'How pronounced the V-shape is: 0=flat, 1=deep V', hoverTarget: 'section_shape' },
-      { key: 'bottom.vPower', label: 'V-Hull Power', min: 1, max: 4, step: 0.1, tooltip: 'Exponent for V-shape curve', hoverTarget: 'section_shape' },
-      { key: 'bottom.chinePos', label: 'Chine Position', min: 0.2, max: 0.6, step: 0.01, tooltip: 'Lateral position of chine (0=centerline, 1=rail)', hoverTarget: 'section_shape' },
-      { key: 'bottom.chineSoftness', label: 'Chine Softness', min: 0, max: 1, step: 0.01, tooltip: 'Blend toward rounded: 0=hard chine, 1=round', hoverTarget: 'section_shape' },
-      { key: 'bottom.deadrise', label: 'Deadrise', min: 0, max: 1, step: 0.01, tooltip: 'Deadrise angle factor', hoverTarget: 'section_shape' },
-      { key: 'bottom.rockerAmp', label: 'Rocker', min: 0, max: 0.15, step: 0.005, unit: 'm', tooltip: 'Maximum keel rise at ends', hoverTarget: 'bottom_hull' },
-      { key: 'bottom.rockerPower', label: 'Rocker Power', min: 1, max: 4, step: 0.1, tooltip: 'Exponent for rocker curve', hoverTarget: 'bottom_hull' },
-      { key: 'bottom.forefoot', label: 'Forefoot Lift', min: 0, max: 0.08, step: 0.005, unit: 'm', tooltip: 'Extra bow lift at forefoot', hoverTarget: 'bow_knife' },
-    ],
-  },
-  {
-    id: 'transom',
-    name: 'Transom',
-    icon: 'Square',
-    description: 'Flat vertical stern plate',
-    params: [
-      { key: 'transom.width', label: 'Width Ratio', min: 0.5, max: 1, step: 0.01, tooltip: 'Transom width as ratio of max beam', hoverTarget: 'transom_face' },
-      { key: 'transom.topCrown', label: 'Top Edge Crown', min: 0, max: 0.04, step: 0.001, unit: 'm', tooltip: 'Crown at top edge (matches deck)', hoverTarget: 'transom_face' },
-      { key: 'transom.bottomCrown', label: 'Bottom Edge Crown', min: 0, max: 0.03, step: 0.001, unit: 'm', tooltip: 'Crown at bottom edge', hoverTarget: 'transom_face' },
-      { key: 'transom.upperCornerRadius', label: 'Upper Corner Radius', min: 0.002, max: 0.015, step: 0.001, unit: 'm', tooltip: 'Small radius = squared feel', hoverTarget: 'transom_face' },
-      { key: 'transom.lowerCornerRadius', label: 'Lower Corner Radius', min: 0.010, max: 0.04, step: 0.001, unit: 'm', tooltip: 'Quarter-cylinder radius', hoverTarget: 'transom_face' },
-      { key: 'transom.rake', label: 'Rake Angle', min: 0, max: 20, step: 0.5, unit: '°', tooltip: 'How much transom leans back', hoverTarget: 'transom_face' },
-      { key: 'transom.height', label: 'Height Ratio', min: 0.5, max: 1, step: 0.01, tooltip: 'Transom height as ratio of hull depth', hoverTarget: 'transom_face' },
-    ],
-  },
-  {
-    id: 'bow',
-    name: 'Bow Knife Edge',
-    icon: 'Sword',
-    description: 'Samurai knife-style bow, not a point',
-    params: [
-      { key: 'bow.edgeLength', label: 'Edge Length', min: 0.10, max: 0.35, step: 0.01, unit: 'm', tooltip: 'Length of the knife edge (20-25cm typical)', hoverTarget: 'bow_knife' },
-      { key: 'bow.angle', label: 'Bevel Angle', min: 30, max: 60, step: 1, unit: '°', tooltip: 'Angle of knife edge (45° typical)', hoverTarget: 'bow_knife' },
-      { key: 'bow.tipRadius', label: 'Edge Radius', min: 0.002, max: 0.015, step: 0.001, unit: 'm', tooltip: 'Rounding on knife edge (never sharp)', hoverTarget: 'bow_knife' },
-      { key: 'bow.bullnoseRadius', label: 'Bullnose Radius', min: 0.005, max: 0.02, step: 0.001, unit: 'm', tooltip: 'Cylindrical rounding at very front', hoverTarget: 'bow_knife' },
-      { key: 'bow.shoulderBlend', label: 'Shoulder Blend', min: 0.05, max: 0.25, step: 0.01, unit: 'm', tooltip: 'How far back bow knife blends into hull', hoverTarget: 'bow_knife' },
-      { key: 'bow.lipOverhang', label: 'Lip Overhang', min: 0.005, max: 0.025, step: 0.001, unit: 'm', tooltip: 'How far deck lip protrudes past stem', hoverTarget: 'bow_knife' },
-    ],
-  },
-  {
-    id: 'beam',
-    name: 'Beam Distribution',
-    icon: 'MoveHorizontal',
-    description: 'Plan view outline - width along length',
-    params: [
-      { key: 'beam.sternWidth', label: 'Stern Width', min: 0.5, max: 1, step: 0.01, tooltip: 'Width at transom as ratio of max beam', hoverTarget: 'beam_curve' },
-      { key: 'beam.maxBeamPos', label: 'Max Beam Position', min: 0.3, max: 0.6, step: 0.01, tooltip: 'U position of maximum beam (0=stern, 1=bow)', hoverTarget: 'beam_curve' },
-      { key: 'beam.bowTaper', label: 'Bow Taper Power', min: 1, max: 3, step: 0.1, tooltip: 'How quickly bow tapers to knife edge', hoverTarget: 'beam_curve' },
-      { key: 'beam.sternBlend', label: 'Stern Blend Region', min: 0.05, max: 0.3, step: 0.01, tooltip: 'Length of region where stern stays wide', hoverTarget: 'transom_face' },
+      { key: 'lip.overhang', label: 'Overhang', min: 0.010, max: 0.050, step: 0.001, unit: 'm', tooltip: 'How far lip extends outboard', hoverTarget: 'lip_elbow' },
+      { key: 'lip.drop', label: 'Drop', min: 0.010, max: 0.040, step: 0.001, unit: 'm', tooltip: 'How far lip drops below deck', hoverTarget: 'lip_elbow' },
+      { key: 'lip.tuckSharpness', label: 'Tuck Sharpness', min: 0, max: 1, step: 0.05, tooltip: 'How abruptly underside tucks', hoverTarget: 'lip_elbow' },
     ],
   },
 ];
@@ -390,11 +385,11 @@ export const PARAM_GROUPS: ParamGroupDef[] = [
 export interface MeshResolution {
   Nu: number;  // Longitudinal samples
   Nv: number;  // Lateral samples
-  lipSamples: number;  // Extra samples in lip region
+  lipSamples: number;  // Lip profile samples
 }
 
 export const MESH_RESOLUTIONS: Record<'low' | 'medium' | 'high', MeshResolution> = {
-  low: { Nu: 32, Nv: 16, lipSamples: 4 },
-  medium: { Nu: 64, Nv: 32, lipSamples: 6 },
-  high: { Nu: 128, Nv: 64, lipSamples: 8 },
+  low: { Nu: 24, Nv: 12, lipSamples: 4 },
+  medium: { Nu: 48, Nv: 24, lipSamples: 8 },
+  high: { Nu: 96, Nv: 48, lipSamples: 12 },
 };

@@ -1,10 +1,7 @@
-// HullMeshV2 - Renders all 5 V2 hull pieces with materials and hover highlighting
+// HullMeshV2 - Renders unified hull mesh (no separate bow cap)
 import { useRef, useMemo, useEffect } from "react";
 import * as THREE from "three";
-import { 
-  HullV2Params, 
-  HULL_PARTS,
-} from "@/lib/parametric/v2/types";
+import { HullV2Params } from "@/lib/parametric/v2/types";
 import { generateCompleteHullV2 } from "@/lib/parametric/v2/meshGenerator";
 
 interface HullMeshV2Props {
@@ -14,12 +11,11 @@ interface HullMeshV2Props {
   highlightTarget: string | null;
 }
 
-// Material colors from design system
+// Material colors
 const HULL_COLOR = "hsl(199, 89%, 48%)";
 const DECK_COLOR = "hsl(0, 0%, 92%)";
 const LIP_COLOR = "hsl(199, 85%, 42%)";
 const TRANSOM_COLOR = "hsl(199, 89%, 48%)";
-const BOW_COLOR = "hsl(199, 89%, 48%)";
 
 const HIGHLIGHT_COLOR = new THREE.Color("hsl(45, 93%, 58%)");
 const NO_EMISSIVE = new THREE.Color(0x000000);
@@ -34,15 +30,14 @@ export function HullMeshV2({
   const deckSheetRef = useRef<THREE.Mesh>(null);
   const lipElbowRef = useRef<THREE.Mesh>(null);
   const transomRef = useRef<THREE.Mesh>(null);
-  const bowCapRef = useRef<THREE.Mesh>(null);
   const wireframeRef = useRef<THREE.LineSegments>(null);
 
-  // Generate all hull geometries - pass resolution string directly
+  // Generate all hull geometries
   const hullParts = useMemo(() => {
     return generateCompleteHullV2(params, resolution);
   }, [params, resolution]);
 
-  // Wireframe geometry (combined from all parts)
+  // Wireframe geometry
   const wireframeGeometry = useMemo(() => {
     if (!showWireframe) return null;
     return new THREE.WireframeGeometry(hullParts.bottomHull.geometry);
@@ -55,7 +50,6 @@ export function HullMeshV2({
       hullParts.deckSheet.geometry.dispose();
       hullParts.lipElbow.geometry.dispose();
       hullParts.transom.geometry.dispose();
-      hullParts.bowCap.geometry.dispose();
     };
   }, [hullParts]);
 
@@ -70,7 +64,7 @@ export function HullMeshV2({
 
   return (
     <group>
-      {/* Bottom Hull */}
+      {/* Bottom Hull - unified surface including bow convergence */}
       <mesh ref={bottomHullRef} geometry={hullParts.bottomHull.geometry}>
         <meshStandardMaterial
           color={HULL_COLOR}
@@ -111,17 +105,6 @@ export function HullMeshV2({
           roughness={0.55}
           side={THREE.DoubleSide}
           {...getEmissive("transom_face")}
-        />
-      </mesh>
-
-      {/* Bow Cap */}
-      <mesh ref={bowCapRef} geometry={hullParts.bowCap.geometry}>
-        <meshStandardMaterial
-          color={BOW_COLOR}
-          metalness={0.25}
-          roughness={0.55}
-          side={THREE.DoubleSide}
-          {...getEmissive("bow_knife")}
         />
       </mesh>
 
