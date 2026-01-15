@@ -1,72 +1,96 @@
 // ============================================
 // V2 HULL CURVE EVALUATION FUNCTIONS
 // ============================================
-// Evaluates parametric curves for hull generation
+// Ortho-driven design: Hull emerges from curves in 2D views
+// Bow is where V-shape converges to knife edge - NOT a separate piece
 
-import { HullV2Params } from './types';
+import { HullV2Params, InterpolationStyle } from './types';
 
-// Smoothstep for smooth transitions
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
 export function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
 }
 
-// Linear interpolation
 export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-// Clamp value
 export function clamp(x: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, x));
+}
+
+// Apply interpolation style to a normalized curve value
+function applyInterpolationStyle(t: number, style: InterpolationStyle): number {
+  switch (style) {
+    case 'balloon':
+      // Bulge outward - curve goes outside the straight line
+      return Math.sin(t * Math.PI / 2);
+    case 'vacuum':
+      // Curve inward - below the straight line
+      return 1 - Math.cos(t * Math.PI / 2);
+    case 'straight':
+    default:
+      return t;
+  }
 }
 
 // ============================================
 // BEAM CURVE B(u) - Half-width distribution
 // u=0 is STERN, u=1 is BOW
+// This defines the TOP VIEW outline
 // ============================================
 
 export function evalBeamV2(u: number, params: HullV2Params): number {
   const { beam } = params.dimensions;
-  const { sternWidth, maxBeamPos, bowTaper, sternBlend } = params.beam;
+  const { sternWidth, maxBeamPos, sternBlend, interpolation } = params.beam;
+  const { taperStart, taperPower, knifeWidth } = params.bow;
   const halfBeam = beam / 2;
   
   let factor = 1.0;
   
-  // Stern region - stays wide for flat transom
+  // STERN REGION: Wide for flat transom
   if (u < sternBlend) {
     const t = u / sternBlend;
-    factor = lerp(sternWidth, 1.0, smoothstep(0, 1, t));
+    const smoothT = applyInterpolationStyle(smoothstep(0, 1, t), interpolation);
+    factor = lerp(sternWidth, 1.0, smoothT);
   }
-  // Mid region - full beam
+  // MID REGION: Full beam
   else if (u < maxBeamPos) {
     factor = 1.0;
   }
-  // Forward of max beam - gradual taper
-  else if (u < 0.9) {
-    const t = (u - maxBeamPos) / (0.9 - maxBeamPos);
-    factor = 1.0 - Math.pow(t, bowTaper) * 0.7;
+  // MAX TO TAPER START: Gentle narrowing
+  else if (u < taperStart) {
+    const t = (u - maxBeamPos) / (taperStart - maxBeamPos);
+    const smoothT = applyInterpolationStyle(smoothstep(0, 1, t), interpolation);
+    factor = lerp(1.0, 0.85, smoothT);
   }
-  // Bow knife region - aggressive taper to knife edge
+  // TAPER START TO BOW: Converge to knife edge
   else {
-    const t = (u - 0.9) / 0.1;
-    const baseWidth = 1.0 - Math.pow((0.9 - maxBeamPos) / (0.9 - maxBeamPos), bowTaper) * 0.7;
-    // Don't go to zero - maintain knife edge width
-    const knifeWidth = 0.02; // Small but not zero
-    factor = lerp(baseWidth, knifeWidth, smoothstep(0, 1, t));
+    const t = (u - taperStart) / (1 - taperStart);
+    const curved = Math.pow(t, taperPower);
+    // From 85% beam down to knife width
+    const knifeRatio = knifeWidth / halfBeam;
+    factor = lerp(0.85, knifeRatio, curved);
   }
   
-  return halfBeam * Math.max(0.01, factor);
+  return halfBeam * Math.max(knifeWidth / halfBeam, factor);
 }
 
 // ============================================
 // KEEL CURVE K(u) - Bottom profile with rocker
+// This defines the bottom line in SIDE VIEW
 // ============================================
 
 export function evalKeelV2(u: number, params: HullV2Params): number {
   const { rockerAmp, rockerPower, forefoot } = params.bottom;
+  const { edgeRake } = params.bow;
+  const { length } = params.dimensions;
   
-  // Base rocker - parabolic
+  // Base rocker - parabolic curve
   const centered = Math.abs(u - 0.5) * 2; // 0 at center, 1 at ends
   let y = rockerAmp * Math.pow(centered, rockerPower);
   
@@ -76,23 +100,41 @@ export function evalKeelV2(u: number, params: HullV2Params): number {
     y += forefoot * smoothstep(0, 1, bowT);
   }
   
+  // Apply bow edge rake - shifts keel up/down at bow
+  if (u > 0.9) {
+    const rakeT = (u - 0.9) / 0.1;
+    const rakeRad = (edgeRake * Math.PI) / 180;
+    // Positive rake = bow tilts forward, keel rises
+    y += Math.tan(rakeRad) * (length * 0.05) * smoothstep(0, 1, rakeT);
+  }
+  
   return -params.dimensions.heightKeel + y;
 }
 
 // ============================================
 // DECK CURVE D(u) - Top profile
-// Flat in side view - returns constant height
-// Crown is handled separately in cross-section
+// Flat in side view - constant height
 // ============================================
 
 export function evalDeckV2(u: number, params: HullV2Params): number {
-  // Deck is flat in side view
-  return params.dimensions.heightDeck;
+  const { edgeRake } = params.bow;
+  const { length } = params.dimensions;
+  
+  let y = params.dimensions.heightDeck;
+  
+  // Apply bow edge rake at extreme bow
+  if (u > 0.95) {
+    const rakeT = (u - 0.95) / 0.05;
+    const rakeRad = (edgeRake * Math.PI) / 180;
+    y += Math.tan(rakeRad) * (length * 0.02) * smoothstep(0, 1, rakeT);
+  }
+  
+  return y;
 }
 
 // ============================================
 // DECK CROWN at station u
-// Convex crown at stern that fades to flat forward
+// Convex crown at stern that fades forward
 // ============================================
 
 export function evalDeckCrownV2(u: number, params: HullV2Params): number {
@@ -109,6 +151,7 @@ export function evalDeckCrownV2(u: number, params: HullV2Params): number {
 // SECTION LAW F(s, u) - Cross-section shape
 // s = normalized lateral position (0 = centerline, 1 = rail)
 // Returns height fraction between keel and deck
+// This is the FRONT VIEW section shape
 // ============================================
 
 export function sectionLawV2(
@@ -117,18 +160,22 @@ export function sectionLawV2(
   params: HullV2Params
 ): number {
   const { vDepth, vPower, chinePos, chineSoftness, deadrise } = params.bottom;
+  const { taperStart } = params.bow;
   
   const absS = Math.abs(s);
   
-  // V-hull component
-  const vT = 1 - Math.pow(1 - absS, lerp(1.5, 4, deadrise));
+  // As we approach bow, V-angle increases (sides converge)
+  let bowFactor = 1.0;
+  if (u > taperStart) {
+    const t = (u - taperStart) / (1 - taperStart);
+    bowFactor = 1 + t * 0.5; // V becomes sharper at bow
+  }
   
-  // Chine/bilge knee
   let t = 0;
   if (absS < chinePos) {
     // Bottom region - V shape
     const normalizedS = absS / chinePos;
-    const vComponent = Math.pow(normalizedS, vPower) * vDepth;
+    const vComponent = Math.pow(normalizedS, vPower * bowFactor) * vDepth;
     const roundComponent = Math.pow(normalizedS, 2) * (1 - vDepth);
     t = (vComponent + roundComponent) * 0.35;
   } else {
@@ -148,43 +195,22 @@ export function sectionLawV2(
 }
 
 // ============================================
-// BOW CONVERGENCE - Simplified 2-stage taper
-// 1. Shoulder fade – hull width eases toward knife region
-// 2. Knife edge – aggressive pinch controlled by params.bow.angle
-// Returns how much to push the surface back (positive = aft)
+// V-ANGLE at station u
+// Returns how collapsed the V is (0=flat, 1=knife)
+// Used by mesh generator to understand convergence
 // ============================================
 
-export function bowBevelConstraint(
-  x: number,
-  _y: number,
-  params: HullV2Params
-): number {
-  const { length } = params.dimensions;
-  const { edgeLength, angle, shoulderBlend } = params.bow;
-
-  const bowX = length / 2; // furthest forward point
-  const blendStart = bowX - shoulderBlend - edgeLength;
-  if (x < blendStart) return 0;
-
-  // Inside the transition band
-  const totalZone = shoulderBlend + edgeLength;
-  const distFromBow = bowX - x;
-
-  // Normalized 0 (bow) to 1 (shoulder start)
-  const t = clamp(distFromBow / totalZone, 0, 1);
-
-  // Convergence profile: sharper at bow (angle controls steepness)
-  // Use inverse smoothstep so knife portion tapers faster.
-  const angleRad = (angle * Math.PI) / 180;
-  const taperCurve = Math.pow(1 - t, 1 + Math.tan(angleRad) * 0.5);
-
-  // Maximum push-back is capped to edgeLength
-  return edgeLength * (1 - taperCurve);
+export function getVAngleFactor(u: number, params: HullV2Params): number {
+  const { taperStart, taperPower } = params.bow;
+  
+  if (u <= taperStart) return 0;
+  
+  const t = (u - taperStart) / (1 - taperStart);
+  return Math.pow(t, taperPower);
 }
 
 // ============================================
-// TRANSOM - Stern face shape
-// Returns points for transom outline
+// TRANSOM OUTLINE - Stern face shape
 // ============================================
 
 export interface TransomPoint {
@@ -195,21 +221,19 @@ export interface TransomPoint {
 
 export function getTransomOutline(params: HullV2Params, samples: number = 32): TransomPoint[] {
   const { beam, heightDeck, heightKeel } = params.dimensions;
-  const { width, topCrown, bottomCrown, upperCornerRadius, lowerCornerRadius, height } = params.transom;
+  const { width, topCrown, bottomCrown, height } = params.transom;
   
   const halfWidth = (beam / 2) * width;
   const points: TransomPoint[] = [];
   
-  const topY = heightDeck - 0.01; // Just below deck
+  const topY = heightDeck - 0.01;
   const bottomY = -heightKeel * height;
   
   for (let i = 0; i <= samples; i++) {
     const t = i / samples;
-    const z = (t * 2 - 1) * halfWidth; // -halfWidth to +halfWidth
-    const absZ = Math.abs(z);
-    const normalizedZ = absZ / halfWidth;
+    const z = (t * 2 - 1) * halfWidth;
+    const normalizedZ = Math.abs(z) / halfWidth;
     
-    // Top edge with crown
     const topCrownOffset = topCrown * (1 - normalizedZ * normalizedZ);
     points.push({
       y: topY + topCrownOffset,
@@ -218,14 +242,11 @@ export function getTransomOutline(params: HullV2Params, samples: number = 32): T
     });
   }
   
-  // Add bottom edge (reverse direction for closed loop)
   for (let i = samples; i >= 0; i--) {
     const t = i / samples;
     const z = (t * 2 - 1) * halfWidth;
-    const absZ = Math.abs(z);
-    const normalizedZ = absZ / halfWidth;
+    const normalizedZ = Math.abs(z) / halfWidth;
     
-    // Bottom edge with crown
     const bottomCrownOffset = bottomCrown * (1 - normalizedZ * normalizedZ);
     points.push({
       y: bottomY - bottomCrownOffset,
