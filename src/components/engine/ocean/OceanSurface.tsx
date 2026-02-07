@@ -1,4 +1,4 @@
-// Gerstner-wave ocean mesh with PBR water shader
+// Gerstner-wave ocean mesh with PBR water shader + heightfield overlay
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -8,9 +8,16 @@ import { waterFragmentShader } from "@/lib/ocean/shaders/waterFragment.glsl";
 interface OceanSurfaceProps {
   size?: number;
   sunDirection?: THREE.Vector3;
+  heightfieldTexture?: THREE.Texture | null;
+  heightfieldWorldSize?: number;
 }
 
-export function OceanSurface({ size = 200, sunDirection }: OceanSurfaceProps) {
+export function OceanSurface({
+  size = 200,
+  sunDirection,
+  heightfieldTexture,
+  heightfieldWorldSize = 100,
+}: OceanSurfaceProps) {
   const meshRef = useRef<THREE.Mesh>(null);
 
   const uniforms = useMemo(
@@ -33,13 +40,18 @@ export function OceanSurface({ size = 200, sunDirection }: OceanSurfaceProps) {
       uSunColor: { value: new THREE.Color("#fff5e0") },
 
       // Beer's law absorption
-      uAbsorption: { value: new THREE.Vector3(0.4, 0.04, 0.02) }, // red absorbed most
+      uAbsorption: { value: new THREE.Vector3(0.4, 0.04, 0.02) },
       uAbsorptionDepth: { value: 3.0 },
 
       // SSS
       uSSSIntensity: { value: 0.35 },
       uSSSPower: { value: 3.0 },
       uSSSColor: { value: new THREE.Color("#1ab890") },
+
+      // Heightfield
+      uHeightfield: { value: null as THREE.Texture | null },
+      uHeightfieldSize: { value: heightfieldWorldSize },
+      uHeightfieldEnabled: { value: 0.0 },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -47,6 +59,9 @@ export function OceanSurface({ size = 200, sunDirection }: OceanSurfaceProps) {
 
   useFrame((state) => {
     uniforms.uTime.value = state.clock.elapsedTime;
+    uniforms.uHeightfield.value = heightfieldTexture ?? null;
+    uniforms.uHeightfieldEnabled.value = heightfieldTexture ? 1.0 : 0.0;
+    uniforms.uHeightfieldSize.value = heightfieldWorldSize;
   });
 
   return (
