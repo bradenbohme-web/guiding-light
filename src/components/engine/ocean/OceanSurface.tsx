@@ -64,14 +64,22 @@ export function OceanSurface({
     uniforms.uHeightfieldSize.value = heightfieldWorldSize;
   });
 
+  // Create XZ-plane geometry so shader pos.xz actually varies in 2D
+  const geometry = useMemo(() => {
+    const segs = 512;
+    const geo = new THREE.PlaneGeometry(size, size, segs, segs);
+    // Rotate geometry vertices from XY to XZ plane (Y=up)
+    geo.rotateX(-Math.PI / 2);
+    return geo;
+  }, [size]);
+
   return (
     <mesh
       ref={meshRef}
-      rotation={[-Math.PI / 2, 0, 0]}
       position={[0, -0.35, 0]}
+      geometry={geometry}
       receiveShadow
     >
-      <planeGeometry args={[size, size, 256, 256]} />
       <shaderMaterial
         vertexShader={waterVertexShader}
         fragmentShader={waterFragmentShader}
