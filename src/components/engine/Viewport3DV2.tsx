@@ -12,6 +12,7 @@ import { BoatGroupV2 } from "./BoatGroupV2";
 import { OceanEnvironment } from "./OceanEnvironment";
 import { HullV2Params } from "@/lib/parametric/v2/types";
 import { LaserRiggingParams } from "@/lib/parametric/laserRigging";
+import { OceanSettings } from "@/lib/ocean/types";
 
 interface Viewport3DV2Props {
   params: HullV2Params;
@@ -28,6 +29,7 @@ interface Viewport3DV2Props {
   windStrength: number;
   boatSpeed: number;
   highlightTarget: string | null;
+  oceanSettings?: OceanSettings;
 }
 
 // Camera positions for different views
@@ -53,6 +55,7 @@ export function Viewport3DV2({
   windStrength,
   boatSpeed,
   highlightTarget,
+  oceanSettings,
 }: Viewport3DV2Props) {
   const cameraPosition = CAMERA_POSITIONS[viewMode];
 
@@ -74,7 +77,7 @@ export function Viewport3DV2({
 
         {/* Environment */}
         {showOcean ? (
-          <OceanEnvironment enabled={true} />
+          <OceanEnvironment enabled={true} oceanSettings={oceanSettings} />
         ) : (
           <>
             {/* Studio lighting for non-ocean mode */}

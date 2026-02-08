@@ -1,10 +1,44 @@
-// Gerstner wave vertex shader — oceanographic multi-group wave model
-// Swell + wind-sea + capillary groups with directional spreading
-// Geometry assumed flat in XZ plane (no mesh rotation)
+// Gerstner wave vertex shader — driven by uniform parameters from OceanSettings
+// Supports primary swell, cross-swell, wind-sea, capillary, and FFT noise detail
 
 export const waterVertexShader = /* glsl */ `
 uniform float uTime;
-uniform float uWaveHeight;
+uniform float uTimeScale;
+uniform float uGlobalWaveHeight;
+
+// Primary swell (3 sub-waves)
+uniform float uSwell1Enabled;
+uniform float uSwell1Dir;
+uniform float uSwell1Wavelength;
+uniform float uSwell1Amplitude;
+uniform float uSwell1Steepness;
+
+// Secondary swell (2 sub-waves)
+uniform float uSwell2Enabled;
+uniform float uSwell2Dir;
+uniform float uSwell2Wavelength;
+uniform float uSwell2Amplitude;
+uniform float uSwell2Steepness;
+
+// Wind sea
+uniform float uWindSeaEnabled;
+uniform float uWindSeaDir;
+uniform float uWindSeaSpeed;
+uniform float uWindSeaSpread;
+uniform float uWindSeaChoppiness;
+
+// Capillary
+uniform float uCapillaryEnabled;
+uniform float uCapillaryIntensity;
+uniform float uCapillaryScale;
+
+// FFT detail noise
+uniform float uFFTEnabled;
+uniform float uFFTWindSpeed;
+uniform float uFFTWindDir;
+uniform float uFFTAmplitude;
+uniform float uFFTChoppiness;
+uniform float uFFTBlend;
 
 // SWE heightfield overlay
 uniform sampler2D uHeightfield;
@@ -19,103 +53,165 @@ varying float vSteepness;
 varying vec3 vViewPosition;
 varying float vHeightfieldFoam;
 
-// ---- Gerstner wave ----
-struct GerstnerResult {
-  vec3 displacement;
-  vec3 tangent;    // partial derivative wrt wave direction
-  vec3 binormal;   // partial derivative wrt perpendicular
-  float steepness;
+// ---- Helpers ----
+#define PI 3.14159265359
+#define TAU 6.28318530718
+
+vec2 dirFromDeg(float deg) {
+  float r = deg * PI / 180.0;
+  return vec2(sin(r), cos(r));
+}
+
+struct GResult {
+  vec3 disp;
+  vec3 nContrib;
+  float steep;
 };
 
-GerstnerResult gerstnerWave(vec2 pos, float t,
-                            vec2 dir, float wavelength, float amplitude, float steepQ) {
-  GerstnerResult r;
-  float k  = 6.28318530718 / wavelength;
-  float c  = sqrt(9.81 / k);             // phase speed (deep water dispersion)
-  float Q  = clamp(steepQ / (amplitude * k * 8.0), 0.0, 1.0);
-
-  vec2 d     = normalize(dir);
+GResult gerstner(vec2 pos, float t, vec2 dir, float wl, float amp, float Q) {
+  GResult r;
+  float k = TAU / wl;
+  float c = sqrt(9.81 / k);
+  float q = clamp(Q / (amp * k * 8.0), 0.0, 1.0);
+  vec2 d = normalize(dir);
   float phase = k * dot(d, pos) - c * k * t;
-  float S     = sin(phase);
-  float C     = cos(phase);
-
-  r.displacement = vec3(
-    -d.x * Q * amplitude * S,
-     amplitude * C,
-    -d.y * Q * amplitude * S
-  );
-
-  float WA = k * amplitude;
-  r.tangent  = vec3(0.0);  // accumulated in main
-  r.binormal = vec3(0.0);
-  r.steepness = abs(WA * S); // max steepness when slope is steepest
+  float S = sin(phase);
+  float C = cos(phase);
+  r.disp = vec3(-d.x * q * amp * S, amp * C, -d.y * q * amp * S);
+  float WA = k * amp;
+  r.nContrib = vec3(d.x * WA * C, q * WA * S, d.y * WA * C);
+  r.steep = abs(WA * S);
   return r;
 }
 
-// Accumulate normal contribution from one wave
-vec3 waveNormalContrib(vec2 pos, float t, vec2 dir, float wavelength, float amplitude, float steepQ) {
-  float k  = 6.28318530718 / wavelength;
-  float c  = sqrt(9.81 / k);
-  float Q  = clamp(steepQ / (amplitude * k * 8.0), 0.0, 1.0);
-  vec2 d   = normalize(dir);
-  float phase = k * dot(d, pos) - c * k * t;
-  float C  = cos(phase);
-  float S  = sin(phase);
-  float WA = k * amplitude;
-  return vec3(
-    d.x * WA * C,
-    Q * WA * S,
-    d.y * WA * C
-  );
+// Simple pseudo-noise for FFT-like spectral detail
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p, float t) {
+  float v = 0.0;
+  float a = 0.5;
+  vec2 shift = vec2(100.0);
+  mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));
+  for (int i = 0; i < 6; i++) {
+    v += a * noise(p + t * 0.3 * float(i + 1) * 0.1);
+    p = rot * p * 2.0 + shift;
+    a *= 0.5;
+  }
+  return v;
 }
 
 void main() {
   vUv = uv;
-  vec3 pos = position;  // XZ plane geometry, Y=0
-  float H = uWaveHeight;
+  vec3 pos = position;
+  float t = uTime * uTimeScale;
+  float H = uGlobalWaveHeight;
 
-  // ============================================================
-  // WAVE GROUP 1: Primary swell — long-period open ocean waves
-  // Direction: roughly from the west-northwest
-  // ============================================================
-  GerstnerResult s1 = gerstnerWave(pos.xz, uTime, vec2(0.85, 0.53),  18.0, H * 1.20, 0.60);
-  GerstnerResult s2 = gerstnerWave(pos.xz, uTime, vec2(0.78, 0.62),  14.0, H * 0.85, 0.55);
-  GerstnerResult s3 = gerstnerWave(pos.xz, uTime, vec2(0.92, 0.40),  22.0, H * 0.65, 0.50);
+  vec3 totalDisp = vec3(0.0);
+  vec3 totalNorm = vec3(0.0);
+  float totalSteep = 0.0;
 
-  // ============================================================
-  // WAVE GROUP 2: Secondary swell — crossing from different storm
-  // Direction: from the south-southwest (cross-sea pattern)
-  // ============================================================
-  GerstnerResult c1 = gerstnerWave(pos.xz, uTime, vec2(-0.25, 0.97), 11.0, H * 0.55, 0.65);
-  GerstnerResult c2 = gerstnerWave(pos.xz, uTime, vec2(-0.40, 0.92),  8.5, H * 0.40, 0.60);
+  // ============ Primary Swell (3 sub-waves with slight spread) ============
+  if (uSwell1Enabled > 0.5) {
+    vec2 d0 = dirFromDeg(uSwell1Dir);
+    vec2 d1 = dirFromDeg(uSwell1Dir + 8.0);
+    vec2 d2 = dirFromDeg(uSwell1Dir - 12.0);
 
-  // ============================================================
-  // WAVE GROUP 3: Local wind-sea — shorter, steeper, more chaotic
-  // Multiple directions with wider angular spread
-  // ============================================================
-  GerstnerResult w1 = gerstnerWave(pos.xz, uTime, vec2(0.60, -0.80),  5.0, H * 0.35, 0.75);
-  GerstnerResult w2 = gerstnerWave(pos.xz, uTime, vec2(-0.70, -0.72), 3.8, H * 0.25, 0.70);
-  GerstnerResult w3 = gerstnerWave(pos.xz, uTime, vec2(0.95, 0.30),   4.2, H * 0.28, 0.72);
-  GerstnerResult w4 = gerstnerWave(pos.xz, uTime, vec2(-0.50, 0.87),  3.2, H * 0.20, 0.68);
-  GerstnerResult w5 = gerstnerWave(pos.xz, uTime, vec2(0.30, -0.95),  2.5, H * 0.18, 0.65);
+    GResult s0 = gerstner(pos.xz, t, d0, uSwell1Wavelength, uSwell1Amplitude * H, uSwell1Steepness);
+    GResult s1 = gerstner(pos.xz, t, d1, uSwell1Wavelength * 0.78, uSwell1Amplitude * H * 0.7, uSwell1Steepness * 0.9);
+    GResult s2 = gerstner(pos.xz, t, d2, uSwell1Wavelength * 1.22, uSwell1Amplitude * H * 0.5, uSwell1Steepness * 0.85);
 
-  // ============================================================
-  // WAVE GROUP 4: Capillary ripples — high frequency detail
-  // Near-random directions, very small amplitude
-  // ============================================================
-  GerstnerResult r1 = gerstnerWave(pos.xz, uTime, vec2(0.42, 0.91),   1.4, H * 0.08, 0.40);
-  GerstnerResult r2 = gerstnerWave(pos.xz, uTime, vec2(-0.88, 0.47),  1.0, H * 0.05, 0.35);
-  GerstnerResult r3 = gerstnerWave(pos.xz, uTime, vec2(0.73, -0.68),  0.7, H * 0.03, 0.30);
-  GerstnerResult r4 = gerstnerWave(pos.xz, uTime, vec2(-0.35, -0.94), 0.5, H * 0.02, 0.25);
+    totalDisp += s0.disp + s1.disp + s2.disp;
+    totalNorm += s0.nContrib + s1.nContrib + s2.nContrib;
+    totalSteep += (s0.steep + s1.steep) * 0.5;
+  }
 
-  // ---- Sum all displacements ----
-  vec3 disp = s1.displacement + s2.displacement + s3.displacement
-            + c1.displacement + c2.displacement
-            + w1.displacement + w2.displacement + w3.displacement + w4.displacement + w5.displacement
-            + r1.displacement + r2.displacement + r3.displacement + r4.displacement;
+  // ============ Secondary Swell (cross-sea, 2 sub-waves) ============
+  if (uSwell2Enabled > 0.5) {
+    vec2 d0 = dirFromDeg(uSwell2Dir);
+    vec2 d1 = dirFromDeg(uSwell2Dir + 15.0);
 
-  pos += disp;
-  vWaveHeight = disp.y;
+    GResult c0 = gerstner(pos.xz, t, d0, uSwell2Wavelength, uSwell2Amplitude * H, uSwell2Steepness);
+    GResult c1 = gerstner(pos.xz, t, d1, uSwell2Wavelength * 0.77, uSwell2Amplitude * H * 0.65, uSwell2Steepness * 0.9);
+
+    totalDisp += c0.disp + c1.disp;
+    totalNorm += c0.nContrib + c1.nContrib;
+    totalSteep += c0.steep * 0.3;
+  }
+
+  // ============ Wind Sea (5 sub-waves with directional spread) ============
+  if (uWindSeaEnabled > 0.5) {
+    float windWL = max(1.5, uWindSeaSpeed * 0.7);
+    float windAmp = uWindSeaSpeed * 0.02 * H;
+    float spreadRad = uWindSeaSpread * PI / 180.0;
+
+    for (int i = 0; i < 5; i++) {
+      float fi = float(i);
+      float angleOffset = (fi - 2.0) * spreadRad * 0.5;
+      vec2 d = dirFromDeg(uWindSeaDir + angleOffset * 180.0 / PI);
+      float wl = windWL * (1.0 - fi * 0.15);
+      float amp = windAmp * (1.0 - fi * 0.18);
+      float Q = uWindSeaChoppiness * (0.8 - fi * 0.1);
+
+      GResult w = gerstner(pos.xz, t, d, wl, amp, Q);
+      totalDisp += w.disp;
+      totalNorm += w.nContrib;
+      totalSteep += w.steep * 0.15;
+    }
+  }
+
+  // ============ Capillary Ripples (4 high-freq waves) ============
+  if (uCapillaryEnabled > 0.5) {
+    float capAmp = uCapillaryIntensity * H * 0.08;
+    float capBase = 1.4 * uCapillaryScale;
+    
+    GResult r0 = gerstner(pos.xz, t, vec2(0.42, 0.91),  capBase,       capAmp,       0.4);
+    GResult r1 = gerstner(pos.xz, t, vec2(-0.88, 0.47), capBase * 0.7, capAmp * 0.6, 0.35);
+    GResult r2 = gerstner(pos.xz, t, vec2(0.73, -0.68), capBase * 0.5, capAmp * 0.4, 0.3);
+    GResult r3 = gerstner(pos.xz, t, vec2(-0.35, -0.94),capBase * 0.35,capAmp * 0.25,0.25);
+
+    totalDisp += r0.disp + r1.disp + r2.disp + r3.disp;
+    totalNorm += r0.nContrib + r1.nContrib + r2.nContrib + r3.nContrib;
+  }
+
+  // ============ FFT Spectral Detail (procedural FBM approximation) ============
+  if (uFFTEnabled > 0.5) {
+    vec2 fftDir = dirFromDeg(uFFTWindDir);
+    float fftScale = 0.3 / max(uFFTAmplitude, 0.0001);
+    vec2 fftUV = pos.xz * fftScale;
+    
+    // Directional bias
+    fftUV += fftDir * t * uFFTWindSpeed * 0.05;
+    
+    float detail = fbm(fftUV, t) - 0.5;
+    float detailX = fbm(fftUV + vec2(0.1, 0.0), t) - 0.5;
+    float detailZ = fbm(fftUV + vec2(0.0, 0.1), t) - 0.5;
+    
+    float fftAmp = uFFTAmplitude * 500.0 * H * uFFTBlend;
+    totalDisp.y += detail * fftAmp;
+    totalDisp.x += (detailX - detail) * fftAmp * uFFTChoppiness * 0.3;
+    totalDisp.z += (detailZ - detail) * fftAmp * uFFTChoppiness * 0.3;
+    
+    // Normal contribution from FFT
+    float dx = (detailX - detail) * fftAmp * 10.0;
+    float dz = (detailZ - detail) * fftAmp * 10.0;
+    totalNorm += vec3(dx, 0.0, dz);
+  }
+
+  pos += totalDisp;
+  vWaveHeight = totalDisp.y;
 
   // ---- SWE heightfield overlay ----
   vHeightfieldFoam = 0.0;
@@ -133,34 +229,9 @@ void main() {
     }
   }
 
-  // ---- Accumulate normals from all waves ----
-  vec3 nSum = vec3(0.0);
-  // Swell
-  nSum += waveNormalContrib(position.xz, uTime, vec2(0.85, 0.53),  18.0, H * 1.20, 0.60);
-  nSum += waveNormalContrib(position.xz, uTime, vec2(0.78, 0.62),  14.0, H * 0.85, 0.55);
-  nSum += waveNormalContrib(position.xz, uTime, vec2(0.92, 0.40),  22.0, H * 0.65, 0.50);
-  // Cross swell
-  nSum += waveNormalContrib(position.xz, uTime, vec2(-0.25, 0.97), 11.0, H * 0.55, 0.65);
-  nSum += waveNormalContrib(position.xz, uTime, vec2(-0.40, 0.92),  8.5, H * 0.40, 0.60);
-  // Wind sea
-  nSum += waveNormalContrib(position.xz, uTime, vec2(0.60, -0.80),  5.0, H * 0.35, 0.75);
-  nSum += waveNormalContrib(position.xz, uTime, vec2(-0.70, -0.72), 3.8, H * 0.25, 0.70);
-  nSum += waveNormalContrib(position.xz, uTime, vec2(0.95, 0.30),   4.2, H * 0.28, 0.72);
-  nSum += waveNormalContrib(position.xz, uTime, vec2(-0.50, 0.87),  3.2, H * 0.20, 0.68);
-  nSum += waveNormalContrib(position.xz, uTime, vec2(0.30, -0.95),  2.5, H * 0.18, 0.65);
-  // Capillary
-  nSum += waveNormalContrib(position.xz, uTime, vec2(0.42, 0.91),   1.4, H * 0.08, 0.40);
-  nSum += waveNormalContrib(position.xz, uTime, vec2(-0.88, 0.47),  1.0, H * 0.05, 0.35);
-  nSum += waveNormalContrib(position.xz, uTime, vec2(0.73, -0.68),  0.7, H * 0.03, 0.30);
-  nSum += waveNormalContrib(position.xz, uTime, vec2(-0.35, -0.94), 0.5, H * 0.02, 0.25);
-
-  vec3 calcNormal = normalize(vec3(-nSum.x, 1.0 - nSum.y, -nSum.z));
+  vec3 calcNormal = normalize(vec3(-totalNorm.x, 1.0 - totalNorm.y, -totalNorm.z));
   vNormal = normalMatrix * calcNormal;
-
-  // Steepness for foam — weighted toward larger, steeper waves
-  vSteepness = (s1.steepness * 0.3 + s2.steepness * 0.2
-              + c1.steepness * 0.15
-              + w1.steepness * 0.15 + w2.steepness * 0.1 + w3.steepness * 0.1);
+  vSteepness = totalSteep;
 
   vWorldPosition = (modelMatrix * vec4(pos, 1.0)).xyz;
   vViewPosition = (modelViewMatrix * vec4(pos, 1.0)).xyz;

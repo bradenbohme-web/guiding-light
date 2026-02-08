@@ -5,6 +5,7 @@ import { BoatGroup } from "./BoatGroup";
 import { OceanEnvironment } from "./OceanEnvironment";
 import { HullParams } from "@/lib/parametric/types";
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING } from "@/lib/parametric/laserRigging";
+import { OceanSettings } from "@/lib/ocean/types";
 
 interface Viewport3DProps {
   params: HullParams;
@@ -21,6 +22,7 @@ interface Viewport3DProps {
   windStrength?: number;
   boatSpeed?: number;
   highlightTarget?: string | null;
+  oceanSettings?: OceanSettings;
 }
 
 export function Viewport3D({
@@ -37,7 +39,8 @@ export function Viewport3D({
   windAngle = 0,
   windStrength = 0.5,
   boatSpeed = 0,
-  highlightTarget = null
+  highlightTarget = null,
+  oceanSettings,
 }: Viewport3DProps) {
   const getCameraConfig = () => {
     switch (viewMode) {
@@ -62,7 +65,7 @@ export function Viewport3D({
         <Suspense fallback={null}>
           {/* Ocean Environment with volumetric lighting, caustics, birds */}
           {showOcean ? (
-            <OceanEnvironment enabled={showOcean} sunPosition={[100, 50, 50]} />
+            <OceanEnvironment enabled={showOcean} oceanSettings={oceanSettings} />
           ) : (
             <>
               {/* Fallback studio lighting when ocean is off */}
