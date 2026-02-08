@@ -19,23 +19,24 @@ import {
   LODConfig,
   LOD_TIERS,
 } from "./ocean/PerformanceManager";
+import { OceanSettings, DEFAULT_OCEAN_SETTINGS } from "@/lib/ocean/types";
 
 interface OceanEnvironmentProps {
   enabled?: boolean;
-  sunPosition?: [number, number, number];
   boatPosition?: THREE.Vector3;
   boatVelocity?: THREE.Vector2;
   boatSpeed?: number;
   qualityOverride?: QualityTier;
+  oceanSettings?: OceanSettings;
 }
 
 export function OceanEnvironment({
   enabled = true,
-  sunPosition = [100, 50, 50],
   boatPosition,
   boatVelocity,
   boatSpeed = 0,
   qualityOverride,
+  oceanSettings = DEFAULT_OCEAN_SETTINGS,
 }: OceanEnvironmentProps) {
   const [heightfieldTex, setHeightfieldTex] = useState<THREE.Texture | null>(null);
   const [heightfieldWorldSize, setHeightfieldWorldSize] = useState(100);
@@ -58,17 +59,24 @@ export function OceanEnvironment({
     []
   );
 
-  // Bow position for breach particle spawning
   const bowPosition = useMemo(() => {
     if (!boatPosition) return undefined;
-    return new THREE.Vector3(
-      boatPosition.x + 2.1, // Bow offset
-      0.1,
-      boatPosition.z
-    );
+    return new THREE.Vector3(boatPosition.x + 2.1, 0.1, boatPosition.z);
   }, [boatPosition]);
 
+  // Compute sun position from settings
+  const sunEl = oceanSettings.atmosphere.sun.elevation * Math.PI / 180;
+  const sunAz = oceanSettings.atmosphere.sun.azimuth * Math.PI / 180;
+  const sunDist = 100;
+  const sunPosition: [number, number, number] = [
+    sunDist * Math.cos(sunEl) * Math.sin(sunAz),
+    sunDist * Math.sin(sunEl),
+    sunDist * Math.cos(sunEl) * Math.cos(sunAz),
+  ];
+
   if (!enabled) return null;
+
+  const { atmosphere } = oceanSettings;
 
   return (
     <group>
@@ -78,14 +86,17 @@ export function OceanEnvironment({
         sunPosition={sunPosition}
         inclination={0.6}
         azimuth={0.25}
-        rayleigh={0.5}
+        rayleigh={atmosphere.sky.rayleigh}
+        turbidity={atmosphere.sky.turbidity}
+        mieCoefficient={atmosphere.sky.mieCoefficient}
+        mieDirectionalG={atmosphere.sky.mieDirectionalG}
       />
 
       {/* Lighting */}
       <directionalLight
         position={sunPosition}
-        intensity={2.5}
-        color="#fff5e0"
+        intensity={atmosphere.sun.intensity}
+        color={atmosphere.sun.color}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-far={100}
@@ -97,9 +108,9 @@ export function OceanEnvironment({
       <ambientLight intensity={0.6} color="#88aacc" />
       <hemisphereLight args={["#87ceeb", "#006644", 0.6]} />
 
-      {/* L1-L2: Gerstner ocean surface with PBR shader + heightfield overlay */}
+      {/* L1-L2: Ocean surface */}
       <OceanSurface
-        size={300}
+        settings={oceanSettings}
         heightfieldTexture={heightfieldTex}
         heightfieldWorldSize={heightfieldWorldSize}
       />
@@ -130,17 +141,19 @@ export function OceanEnvironment({
       />
 
       {/* Underwater */}
-      <UnderwaterCaustics />
-      <UnderwaterDepth />
+      {oceanSettings.underwater.causticsEnabled && <UnderwaterCaustics />}
+      {oceanSettings.underwater.depthFogEnabled && <UnderwaterDepth />}
 
       {/* Atmosphere */}
-      <VolumetricLightRays />
+      {atmosphere.godRays && <VolumetricLightRays />}
 
       {/* Birds */}
       <BirdFlock count={15} />
 
       {/* Fog */}
-      <fog attach="fog" args={["#b0d4e8", 50, 250]} />
+      {atmosphere.fog.enabled && (
+        <fog attach="fog" args={[atmosphere.fog.color, atmosphere.fog.near, atmosphere.fog.far]} />
+      )}
     </group>
   );
 }

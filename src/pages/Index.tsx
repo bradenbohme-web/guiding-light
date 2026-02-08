@@ -9,11 +9,13 @@ import { RiggingPanel } from "@/components/engine/RiggingPanel";
 import { ReferencePack, ReferencePackState, DEFAULT_REFERENCE_PACK } from "@/components/engine/ReferencePack";
 import { InteractiveCurveEditor } from "@/components/engine/InteractiveCurveEditor";
 import { HeatmapGradientEditor, GradientStop, DEFAULT_GRADIENT_STOPS } from "@/components/engine/HeatmapGradientEditor";
+import { OceanSettingsPanel } from "@/components/engine/ocean/OceanSettingsPanel";
 import { HullParams, DEFAULT_HULL_PARAMS } from "@/lib/parametric/types";
 import { HullV2Params, DEFAULT_HULL_V2_PARAMS } from "@/lib/parametric/v2/types";
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING } from "@/lib/parametric/laserRigging";
+import { OceanSettings, DEFAULT_OCEAN_SETTINGS } from "@/lib/ocean/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cpu, Settings, TrendingUp, Sailboat, Grid2X2, Image } from "lucide-react";
+import { Cpu, Settings, TrendingUp, Sailboat, Grid2X2, Image, Waves } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +48,7 @@ const Index = () => {
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [referencePack, setReferencePack] = useState<ReferencePackState>(DEFAULT_REFERENCE_PACK);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
+  const [oceanSettings, setOceanSettings] = useState<OceanSettings>({ ...DEFAULT_OCEAN_SETTINGS });
 
   const handleReset = () => {
     setParams({ ...DEFAULT_HULL_PARAMS });
@@ -61,6 +64,7 @@ const Index = () => {
     setShowOcean(true);
     setReferencePack(DEFAULT_REFERENCE_PACK);
     setGradientStops(DEFAULT_GRADIENT_STOPS);
+    setOceanSettings({ ...DEFAULT_OCEAN_SETTINGS });
   };
 
   const meshStats = useMemo(() => {
@@ -165,6 +169,10 @@ const Index = () => {
                 <Image className="w-3.5 h-3.5" />
                 Ref
               </TabsTrigger>
+              <TabsTrigger value="ocean" className="gap-1.5 data-[state=active]:bg-secondary text-xs">
+                <Waves className="w-3.5 h-3.5" />
+                Ocean
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="params" className="flex-1 min-h-0 m-0 overflow-y-auto scrollbar-hide">
@@ -252,6 +260,13 @@ const Index = () => {
                 onChange={setReferencePack}
               />
             </TabsContent>
+            
+            <TabsContent value="ocean" className="flex-1 min-h-0 m-0 overflow-y-auto scrollbar-hide">
+              <OceanSettingsPanel
+                settings={oceanSettings}
+                onChange={setOceanSettings}
+              />
+            </TabsContent>
           </Tabs>
         </div>
 
@@ -273,6 +288,7 @@ const Index = () => {
               windStrength={windStrength}
               boatSpeed={boatSpeed}
               highlightTarget={highlightTarget}
+              oceanSettings={oceanSettings}
             />
           ) : (
             <Viewport3D
@@ -290,6 +306,7 @@ const Index = () => {
               windStrength={windStrength}
               boatSpeed={boatSpeed}
               highlightTarget={highlightTarget}
+              oceanSettings={oceanSettings}
             />
           )}
           
