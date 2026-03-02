@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { Viewport3D } from "@/components/engine/Viewport3D";
 import { Viewport3DV2 } from "@/components/engine/Viewport3DV2";
 import { ParameterPanel } from "@/components/engine/ParameterPanel";
@@ -104,6 +105,11 @@ const Index = () => {
             <p className="text-xs text-muted-foreground">Universal Parametric Asset Engine</p>
           </div>
         </div>
+
+        {/* Workshop Link */}
+        <Link to="/workshop" className="text-xs font-mono text-primary hover:underline px-3 py-1.5 bg-primary/10 rounded-lg border border-primary/20">
+          🔧 Workshop
+        </Link>
         
         {/* Hull Version Toggle */}
         <div className="flex items-center gap-3">
