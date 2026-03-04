@@ -154,6 +154,14 @@ export function generateDeckSheetV2(
     // Deck inset from rail to match lip attachment
     const lipInset = params.lip.overhang * 0.7;
     
+    // Stern rise: deck edges curve upward near stern
+    const { sternRise, sternRiseStart } = params.deck;
+    let sternRiseAmount = 0;
+    if (u < sternRiseStart) {
+      const t = 1 - u / sternRiseStart;
+      sternRiseAmount = sternRise * t * t; // Quadratic rise toward stern
+    }
+    
     for (let j = 0; j <= Nv; j++) {
       const s = j / Nv;
       const zNorm = s * 2 - 1; // -1 to 1
@@ -163,7 +171,11 @@ export function generateDeckSheetV2(
       const normalizedZ = Math.abs(zNorm);
       const edgeFade = smoothstep(0.85, 1.0, normalizedZ);
       const crownOffset = deckCrown * Math.pow(1 - normalizedZ * normalizedZ, params.deck.crownPower);
-      const y = yDeck + crownOffset * (1 - edgeFade * 0.3);
+      
+      // Stern rise is strongest at edges, zero at centerline
+      const edgeRise = sternRiseAmount * normalizedZ;
+      
+      const y = yDeck + crownOffset * (1 - edgeFade * 0.3) + edgeRise;
       
       positions.push(x, y, z);
       normals.push(0, 1, 0);
@@ -356,7 +368,7 @@ export function generateTransomV2(
   resolution: 'low' | 'medium' | 'high' = 'medium'
 ): GeneratedMeshV2 {
   const { length } = params.dimensions;
-  const { rake } = params.transom;
+  const { rake, flatness } = params.transom;
   const Nv = MESH_RESOLUTIONS[resolution].Nv;
   
   const positions: number[] = [];
@@ -372,6 +384,10 @@ export function generateTransomV2(
   const yDeck = evalDeckV2(0, params);
   const deckCrown = evalDeckCrownV2(0, params);
   
+  // Match the lip geometry at stern
+  const lipInset = params.lip.overhang * 0.7;
+  const lipDrop = params.lip.drop;
+  
   const Nz = Nv;
   const Ny = Math.floor(Nv / 2);
   
@@ -383,18 +399,28 @@ export function generateTransomV2(
       const sNorm = uFrac * 2 - 1;
       const s = Math.abs(sNorm);
       
-      const z = sNorm * halfBeam;
+      // Z position: match hull beam minus lip inset at top, full beam at bottom
+      const zTop = sNorm * (halfBeam - lipInset);
+      const zBot = sNorm * halfBeam;
+      const z = lerp(zBot, zTop, vFrac);
       
+      // Bottom: trace actual hull section shape
       const sectionT = sectionLawV2(s, 0, params);
       const yHullSection = yKeel + (yDeck - yKeel) * sectionT;
       
+      // Flatness: blend between following hull section and flat line
+      const yFlat = lerp(yKeel, yDeck, s);
+      const yBottom = lerp(yHullSection, yFlat, flatness);
+      
+      // Top: match deck with crown and lip drop at edges
       const normalizedZ = Math.abs(sNorm);
       const crownOffset = deckCrown * Math.pow(1 - normalizedZ * normalizedZ, params.deck.crownPower);
-      const yDeckWithCrown = yDeck + crownOffset;
+      const yTop = yDeck + crownOffset - lipDrop * normalizedZ * 0.3;
       
-      const y = lerp(yHullSection, yDeckWithCrown, vFrac);
+      const y = lerp(yBottom, yTop, vFrac);
       
-      const heightRange = yDeckWithCrown - yHullSection;
+      // Rake offset
+      const heightRange = yTop - yBottom;
       const xOffset = heightRange * Math.tan(rakeRad) * vFrac;
       const xPos = sternX - xOffset;
       

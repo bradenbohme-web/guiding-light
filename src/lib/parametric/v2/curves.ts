@@ -51,31 +51,30 @@ function applyInterpolationStyle(t: number, style: InterpolationStyle): number {
 export function evalBeamV2(u: number, params: HullV2Params): number {
   const { beam } = params.dimensions;
   const { sternWidth, maxBeamPos, sternBlend, interpolation } = params.beam;
-  const { knifeWidth } = params.bow;
+  const { knifeWidth, taperStart, taperPower } = params.bow;
   const halfBeam = beam / 2;
   const knifeRatio = knifeWidth / halfBeam;
 
-  // Build a smooth beam distribution using a single continuous approach:
-  // 1. From u=0 (stern) to maxBeamPos: blend from sternWidth to 1.0
-  // 2. From maxBeamPos to u=1 (bow): blend from 1.0 down to knifeRatio
-  // Both transitions use smooth curves with no hard corners
+  // Three regions:
+  // 1. u=0 to maxBeamPos: stern width → full beam (smooth rise)
+  // 2. maxBeamPos to taperStart: full beam plateau (holds width)
+  // 3. taperStart to u=1: full beam → knife edge (controlled taper)
 
   let factor: number;
 
   if (u <= maxBeamPos) {
     // Stern to max beam: smooth rise from sternWidth to 1.0
-    // Use sternBlend to control how quickly we reach full beam
     const t = u / maxBeamPos;
-    // Apply interpolation style for shape control
     const shaped = applyInterpolationStyle(smootherstep(t), interpolation);
     factor = lerp(sternWidth, 1.0, shaped);
+  } else if (u <= taperStart) {
+    // Plateau: hold at full beam between maxBeamPos and taperStart
+    factor = 1.0;
   } else {
-    // Max beam to bow: smooth continuous taper to knife edge
-    const t = (u - maxBeamPos) / (1 - maxBeamPos);
-    // Use a smooth power curve that starts gently and accelerates
-    const shaped = applyInterpolationStyle(smootherstep(t), interpolation);
-    // Ease into the taper: slow at first, faster toward bow
-    const tapered = Math.pow(shaped, 1.5);
+    // Bow taper: taperStart to u=1, controlled by taperPower
+    const t = (u - taperStart) / (1 - taperStart);
+    // taperPower controls shape: 1=linear, <1=early pinch, >1=late pinch (fuller bow)
+    const tapered = Math.pow(smootherstep(t), taperPower);
     factor = lerp(1.0, knifeRatio, tapered);
   }
 
