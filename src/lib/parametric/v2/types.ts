@@ -69,6 +69,8 @@ export interface DeckSheetParams {
   crownFadeStart: number;  // U position where crown starts fading (0-1)
   crownFadeEnd: number;    // U position where crown is zero (0-1)
   crownPower: number;      // Exponent for crown shape across beam
+  sternRise: number;       // How much the stern deck edges rise upward (m)
+  sternRiseStart: number;  // U position where stern rise begins (0-1)
 }
 
 export interface LipElbowParams {
@@ -102,6 +104,7 @@ export interface TransomParams {
   lowerCornerRadius: number;
   rake: number;            // Transom lean angle (degrees)
   height: number;          // 0-1: ratio of hull height
+  flatness: number;        // 0-1: 0=follows hull section, 1=perfectly flat
 }
 
 // SIMPLIFIED BOW PARAMS - No separate bow cap, just edge control
@@ -145,6 +148,8 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
     crownFadeStart: 0.0,
     crownFadeEnd: 0.4,
     crownPower: 2.0,
+    sternRise: 0.015,
+    sternRiseStart: 0.15,
   },
   lip: {
     overhang: 0.030,
@@ -173,6 +178,7 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
     lowerCornerRadius: 0.02,
     rake: 8,
     height: 0.85,
+    flatness: 0.3,
   },
   bow: {
     edgeRake: 15,          // Bow edge tilts 15° forward in side view
@@ -351,6 +357,8 @@ export const PARAM_GROUPS: ParamGroupDef[] = [
       { key: 'deck.crownFadeStart', label: 'Crown Fade Start', min: 0, max: 0.5, step: 0.01, tooltip: 'U where crown starts diminishing', hoverTarget: 'deck_sheet' },
       { key: 'deck.crownFadeEnd', label: 'Crown Fade End', min: 0.2, max: 0.8, step: 0.01, tooltip: 'U where crown is zero', hoverTarget: 'deck_sheet' },
       { key: 'deck.crownPower', label: 'Crown Power', min: 1, max: 4, step: 0.1, tooltip: 'Exponent for crown shape', hoverTarget: 'deck_sheet' },
+      { key: 'deck.sternRise', label: 'Stern Rise', min: 0, max: 0.05, step: 0.001, unit: 'm', tooltip: 'How much the stern deck edges curve upward', hoverTarget: 'deck_sheet' },
+      { key: 'deck.sternRiseStart', label: 'Stern Rise Start', min: 0.05, max: 0.3, step: 0.01, tooltip: 'U position where stern rise begins', hoverTarget: 'deck_sheet' },
     ],
   },
   {
@@ -362,6 +370,7 @@ export const PARAM_GROUPS: ParamGroupDef[] = [
       { key: 'transom.width', label: 'Width Ratio', min: 0.5, max: 1, step: 0.01, tooltip: 'Transom width as ratio of max beam', hoverTarget: 'transom_face' },
       { key: 'transom.rake', label: 'Rake Angle', min: 0, max: 20, step: 0.5, unit: '°', tooltip: 'How much transom leans back', hoverTarget: 'transom_face' },
       { key: 'transom.height', label: 'Height Ratio', min: 0.5, max: 1, step: 0.01, tooltip: 'Transom height as ratio of hull depth', hoverTarget: 'transom_face' },
+      { key: 'transom.flatness', label: 'Flatness', min: 0, max: 1, step: 0.01, tooltip: '0=follows hull section shape, 1=perfectly flat', hoverTarget: 'transom_face' },
       { key: 'transom.topCrown', label: 'Top Crown', min: 0, max: 0.04, step: 0.001, unit: 'm', tooltip: 'Crown at top edge', hoverTarget: 'transom_face' },
     ],
   },
