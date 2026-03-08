@@ -553,10 +553,6 @@ export function ClothSail({
         />
       </mesh>
 
-      {/* Battens on the LEECH - follow cloth simulation */}
-      {battenMeshes.map((b, i) => (
-        <BattenMesh key={i} batten={b} />
-      ))}
 
       {/* Sail window (vinyl) - follows cloth simulation */}
       {rigging.sail.window.enabled && <WindowMesh />}
