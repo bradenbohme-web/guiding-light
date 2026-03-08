@@ -545,7 +545,7 @@ export function ClothSail({
     }
   });
 
-  const gooseneckY = rigging.boom.gooseneckHeight;
+  const gooseneckPosition = rigging.boom.position;
   const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
 
 

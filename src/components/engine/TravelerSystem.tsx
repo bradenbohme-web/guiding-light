@@ -39,7 +39,6 @@ export function TravelerSystem({ traveler, showWireframe = false, highlight = fa
   }, [traveler.trackHalfSpan]);
 
   const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
-  const clampedZ = THREE.MathUtils.clamp(traveler.carZ, -traveler.trackHalfSpan, traveler.trackHalfSpan);
 
   return (
     <group position={[traveler.x, traveler.y, 0]}>

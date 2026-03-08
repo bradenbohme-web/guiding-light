@@ -44,7 +44,11 @@ function MastMesh({ rigging, showWireframe, highlight }: { rigging: LaserRigging
   return (
     <mesh
       geometry={geometry}
-      position={[rigging.mast.position.x, rigging.mast.height / 2 + 0.12, rigging.mast.position.z]}
+      position={[
+        rigging.mast.position.x,
+        rigging.mast.position.y + rigging.mast.height / 2,
+        rigging.mast.position.z,
+      ]}
     >
       <meshStandardMaterial
         color={rigging.mast.color}
