@@ -730,12 +730,7 @@ function buildReferenceLines(params: LaserHullUltimateParams) {
     keel.push(new THREE.Vector3(x, 0, zKeel - 0.003));
   }
 
-  return {
-    planUpper: new THREE.BufferGeometry().setFromPoints(planUpper),
-    planLower: new THREE.BufferGeometry().setFromPoints(planLower),
-    sheer: new THREE.BufferGeometry().setFromPoints(sheer),
-    keel: new THREE.BufferGeometry().setFromPoints(keel),
-  };
+  return { planUpper, planLower, sheer, keel };
 }
 
 export function useLaserHullUltimateGeometries(overrides?: Partial<LaserHullUltimateParams>) {
