@@ -49,6 +49,7 @@ export function ClothSail({
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const windowGeometryRef = useRef<THREE.BufferGeometry | null>(null);
+  const battenMeshRefs = useRef<THREE.Mesh[]>([]);
   const pointsRef = useRef<ClothPoint[]>([]);
 
   const { luffLength, footLength, clothSegmentsWidth, clothSegmentsHeight } = rigging.sail;
@@ -518,6 +519,27 @@ export function ClothSail({
       winPos.needsUpdate = true;
       windowGeometryRef.current.computeVertexNormals();
     }
+
+    // Update batten tube meshes from single-row cloth points
+    if (rigging.sail.battens.enabled && battenPointIndices) {
+      battenPointIndices.forEach((rowPts, bi) => {
+        const mesh = battenMeshRefs.current[bi];
+        if (!mesh || !rowPts || rowPts.length < 2) return;
+
+        // Build a curve from the cloth points in this single row
+        const curvePoints: THREE.Vector3[] = [];
+        for (let ii = 0; ii < rowPts.length; ii++) {
+          const p = pts[rowPts[ii]];
+          curvePoints.push(p.position.clone().add(new THREE.Vector3(0, 0, 0.003)));
+        }
+
+        const curve = new THREE.CatmullRomCurve3(curvePoints, false);
+        const tubeGeo = new THREE.TubeGeometry(curve, Math.max(4, curvePoints.length * 2), 0.006, 4, false);
+
+        mesh.geometry.dispose();
+        mesh.geometry = tubeGeo;
+      });
+    }
   });
 
   const gooseneckY = rigging.boom.gooseneckHeight;
@@ -564,6 +586,27 @@ export function ClothSail({
 
       {/* Sail window (vinyl) - follows cloth simulation */}
       {rigging.sail.window.enabled && <WindowMesh />}
+
+      {/* Visible batten tubes - each follows a single snapped cloth row */}
+      {rigging.sail.battens.enabled && battenPointIndices.map((rowPts, bi) => {
+        if (!rowPts || rowPts.length < 2) return null;
+        return (
+          <mesh
+            key={`batten-${bi}`}
+            ref={(el) => { if (el) battenMeshRefs.current[bi] = el; }}
+          >
+            <tubeGeometry args={[
+              new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,0), new THREE.Vector3(0.01,0,0)]),
+              2, 0.006, 4, false
+            ]} />
+            <meshStandardMaterial
+              color="#2a2a2a"
+              roughness={0.6}
+              metalness={0.3}
+            />
+          </mesh>
+        );
+      })}
     </group>
   );
 }
