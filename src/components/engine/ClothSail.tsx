@@ -534,41 +534,58 @@ export function ClothSail({
     });
   }, [rigging.sail.battens, luffLength, footLength, battenPointIndices]);
 
-  // Dynamic batten meshes that follow the cloth surface as curved strips
+  // Rigid batten strips: positioned by first/last cloth point but stay straight
   const BattenMesh = ({ batten }: { batten: (typeof battenMeshes)[number] }) => {
-    const tubeRef = useRef<THREE.Mesh>(null);
-    const battenRadius = 0.009;
-    const radialSegments = 4;
+    const meshRef = useRef<THREE.Mesh>(null);
 
     useFrame(() => {
-      if (!tubeRef.current || batten.pointIndices.length < 2 || pointsRef.current.length === 0) return;
+      if (!meshRef.current || batten.pointIndices.length < 2 || pointsRef.current.length === 0) return;
 
       const pts = pointsRef.current;
       const indices = batten.pointIndices;
 
-      // Build a curve from the actual cloth simulation points
-      const curvePoints: THREE.Vector3[] = [];
-      for (const idx of indices) {
-        if (pts[idx]) {
-          // Offset slightly above sail surface so batten sits on top
-          curvePoints.push(pts[idx].position.clone().add(new THREE.Vector3(0, 0, 0.006)));
-        }
+      const firstPt = pts[indices[0]];
+      const lastPt = pts[indices[indices.length - 1]];
+      if (!firstPt || !lastPt) return;
+
+      // Position at midpoint between first and last batten cloth point
+      const mid = firstPt.position.clone().add(lastPt.position).multiplyScalar(0.5);
+      // Offset slightly above sail surface
+      mid.z += 0.005;
+      meshRef.current.position.copy(mid);
+
+      // Orient along the line from first to last point
+      const dir = lastPt.position.clone().sub(firstPt.position);
+      const len = dir.length();
+      dir.normalize();
+
+      // Scale to actual span between endpoints
+      meshRef.current.scale.x = len / batten.length;
+
+      // Build orientation: X along batten direction
+      const up = new THREE.Vector3(0, 0, 1);
+      const right = new THREE.Vector3().crossVectors(dir, up).normalize();
+      if (right.lengthSq() < 0.001) right.set(0, 1, 0);
+      const adjustedUp = new THREE.Vector3().crossVectors(right, dir).normalize();
+      const rotMatrix = new THREE.Matrix4().makeBasis(dir, right, adjustedUp);
+      meshRef.current.quaternion.setFromRotationMatrix(rotMatrix);
+
+      // CRITICAL: Force cloth points along the batten to stay on the straight line
+      // This makes the batten act as a rigid stiffener sewn into the sail
+      for (let i = 1; i < indices.length - 1; i++) {
+        const pt = pts[indices[i]];
+        if (!pt || pt.fixed) continue;
+        const t = i / (indices.length - 1);
+        const target = firstPt.position.clone().lerp(lastPt.position, t);
+        // Blend toward straight line — high blend = rigid batten
+        const rigidity = 0.85 * (rigging.sail.battens.stiffness ?? 0.8);
+        pt.position.lerp(target, rigidity);
       }
-
-      if (curvePoints.length < 2) return;
-
-      // Create a smooth curve through the cloth points
-      const curve = new THREE.CatmullRomCurve3(curvePoints, false, 'centripetal', 0.5);
-      const tubeGeo = new THREE.TubeGeometry(curve, Math.max(curvePoints.length * 2, 8), battenRadius, radialSegments, false);
-
-      // Swap geometry
-      tubeRef.current.geometry.dispose();
-      tubeRef.current.geometry = tubeGeo;
     });
 
     return (
-      <mesh ref={tubeRef}>
-        <tubeGeometry args={[new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,0), new THREE.Vector3(0.1,0,0)]), 4, battenRadius, radialSegments, false]} />
+      <mesh ref={meshRef}>
+        <boxGeometry args={[batten.length, 0.004, 0.018]} />
         <meshStandardMaterial color="hsl(0, 0%, 25%)" roughness={0.5} />
       </mesh>
     );
