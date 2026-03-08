@@ -190,7 +190,7 @@ export const DEFAULT_LASER_HARDPOINTS: Hardpoint[] = [
   { id: "boom_end", attach: "boom", position: new THREE.Vector3(-2.55, 0.0, 0.0), label: "Boom End" },
   
   // Mast hardpoints
-  { id: "mast_head", attach: "mast", position: new THREE.Vector3(0.0, 6.8, 0.0), label: "Masthead" },
+  { id: "mast_head", attach: "mast", position: new THREE.Vector3(0.0, 6.1, 0.0), label: "Masthead" },
   { id: "halyard_exit", attach: "mast", position: new THREE.Vector3(0.0, 0.3, 0.0), label: "Halyard Exit" },
   { id: "cunningham_mast", attach: "mast", position: new THREE.Vector3(0.0, 0.4, 0.0), label: "Cunningham Mast" },
   

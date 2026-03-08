@@ -184,7 +184,9 @@ function VangRope({
   );
 }
 
-// Cunningham rope
+// Cunningham rope — Laser cunningham uses a 6:1 purchase
+// Routes through a cringle on the sail tack, down to a block on the vang bracket,
+// back up, with tail led aft to a cleat on the deck
 function CunninghamRope({
   rigging,
   boomAngle,
@@ -197,15 +199,30 @@ function CunninghamRope({
   const geometry = useMemo(() => {
     const mastX = rigging.mast.position.x;
     const gooseneckY = rigging.boom.gooseneckHeight;
+    const sag = (1 - rigging.cunninghamTension) * 0.05;
+    const offset = 0.008;
 
-    const sailAttach = new THREE.Vector3(mastX + 0.02, gooseneckY + 0.15, 0);
-    const cleat = new THREE.Vector3(0.08, 0.1, 0);
+    // Cunningham cringle (sail tack, just above gooseneck)
+    const cringle = new THREE.Vector3(mastX + 0.03, gooseneckY + 0.10, 0);
+    // Deck block (near mast base)
+    const deckBlock = new THREE.Vector3(mastX + 0.04, 0.14, 0.02);
 
-    const sag = (1 - rigging.cunninghamTension) * 0.08;
-    const points = calculateCatenary(sailAttach, cleat, sag, 12);
+    const points: THREE.Vector3[] = [];
+
+    // Pass 1: cringle → deck block
+    points.push(...calculateCatenary(cringle, deckBlock, sag, 8));
+    // Pass 2: deck → cringle (offset)
+    const cr2 = cringle.clone().add(new THREE.Vector3(0, 0, offset));
+    points.push(...calculateCatenary(deckBlock, cr2, sag * 0.7, 8));
+    // Pass 3: cringle → deck (offset)
+    const db2 = deckBlock.clone().add(new THREE.Vector3(0, 0, -offset));
+    points.push(...calculateCatenary(cr2, db2, sag * 0.5, 8));
+    // Tail to cleat
+    const cleat = new THREE.Vector3(mastX + 0.08, 0.10, 0.04);
+    points.push(...calculateCatenary(db2, cleat, sag * 0.3, 6));
 
     const curve = new THREE.CatmullRomCurve3(points);
-    return new THREE.TubeGeometry(curve, 18, 0.0025, 6, false);
+    return new THREE.TubeGeometry(curve, points.length, 0.0025, 6, false);
   }, [rigging, boomAngle]);
 
   const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
