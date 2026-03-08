@@ -181,16 +181,16 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
     flatness: 0.3,
   },
   bow: {
-    edgeRake: 15,          // Bow edge tilts 15° forward in side view
-    taperStart: 0.48,      // Earlier fair taper for Laser-like planform
-    taperPower: 1.0,       // Neutral fullness default
-    knifeWidth: 0.01,      // 1cm default tip width (less stem plateau)
+    edgeRake: 15,
+    taperStart: 0.78,      // Keep shoulders broad longer; taper in final approach
+    taperPower: 2.1,       // Fuller carry, faster final convergence
+    knifeWidth: 0.02,      // Avoid excessive needle while retaining pointed entry
   },
   beam: {
-    sternWidth: 0.82,
-    maxBeamPos: 0.40,      // Widest point ~40% from stern (Laser-like)
+    sternWidth: 0.84,
+    maxBeamPos: 0.52,      // Shorter bow-run taper, closer to Laser top-profile feel
     sternBlend: 0.15,
-    interpolation: 'balloon',  // Smooth sine rise from stern
+    interpolation: 'balloon',
   },
 };
 
@@ -317,9 +317,9 @@ export const PARAM_GROUPS: ParamGroupDef[] = [
     icon: 'Navigation',
     description: 'How hull sides converge to knife edge',
     params: [
-      { key: 'bow.taperStart', label: 'Taper Accel Point', min: 0.3, max: 0.9, step: 0.01, tooltip: 'Where taper accelerates (higher=fuller bow, lower=leaner)', hoverTarget: 'bow_edge' },
+      { key: 'bow.taperStart', label: 'Taper Accel Point', min: 0.55, max: 0.9, step: 0.01, tooltip: 'Where taper accelerates (higher=fuller bow, lower=leaner)', hoverTarget: 'bow_edge' },
       { key: 'bow.taperPower', label: 'Bow Fullness', min: 0.3, max: 3, step: 0.1, tooltip: 'How full the bow stays (higher=fuller, rounder)', hoverTarget: 'bow_edge' },
-      { key: 'bow.knifeWidth', label: 'Knife Width', min: 0.005, max: 0.06, step: 0.005, unit: 'm', tooltip: 'Minimum width at bow tip', hoverTarget: 'bow_edge' },
+      { key: 'bow.knifeWidth', label: 'Knife Width', min: 0.01, max: 0.08, step: 0.005, unit: 'm', tooltip: 'Minimum width at bow tip', hoverTarget: 'bow_edge' },
       { key: 'bow.edgeRake', label: 'Edge Rake', min: -30, max: 30, step: 1, unit: '°', tooltip: 'Bow edge angle in side view (bottom hull only)', hoverTarget: 'bow_edge' },
     ],
   },
