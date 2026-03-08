@@ -53,19 +53,16 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
   const { sternWidth, maxBeamPos, sternBlend, interpolation } = params.beam;
   const { knifeWidth, taperStart, taperPower } = params.bow;
   const halfBeam = beam / 2;
-  const knifeRatio = knifeWidth / halfBeam;
 
-  // Fair, continuous teardrop planform with no shoulder/plateau break:
-  // - Stern side: controlled smooth rise to max beam
-  // - Bow side: single smooth logistic taper to knife edge
+  // Keep a practical minimum so the bow never devolves into a needle-like spike.
+  const knifeRatio = clamp(knifeWidth / halfBeam, 0.02, 0.25);
 
   let factor: number;
 
   if (u <= maxBeamPos) {
     const t = clamp(u / Math.max(1e-6, maxBeamPos), 0, 1);
 
-    // sternBlend controls how long the stern stays relatively narrow
-    // low blend -> faster rise, high blend -> slower rise
+    // low sternBlend -> faster rise, high sternBlend -> slower rise
     const blendNorm = clamp((sternBlend - 0.05) / 0.25, 0, 1);
     const sternShape = lerp(0.8, 2.4, blendNorm);
 
@@ -75,21 +72,30 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
   } else {
     const t = clamp((u - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos), 0, 1);
 
-    // Fair bow taper with no shoulder and no early neck plateau.
-    // taperStart shifts taper timing without creating a flat segment.
-    const taperNorm = clamp((taperStart - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos), 0.05, 0.95);
+    // Two-phase bow taper:
+    // 1) carry fullness after max beam,
+    // 2) accelerate convergence near the front.
+    const taperNorm = clamp(
+      (taperStart - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos),
+      0.1,
+      0.92
+    );
     const fullness = clamp((taperPower - 0.3) / (3 - 0.3), 0, 1);
 
-    // Timing warp around the mid-region; preserves endpoints and continuity.
-    // Lower taperStart => earlier taper, higher taperStart => later/fuller carry.
-    const timingShift = (0.5 - taperNorm) * 1.1;
-    const warpedT = clamp(t + timingShift * t * (1 - t), 0, 1);
+    const preT = clamp(t / Math.max(1e-6, taperNorm), 0, 1);
+    const preCurve = smootherstep(preT);
 
-    // Fullness controls how long width is carried before final convergence.
-    const curvePow = lerp(0.9, 2.2, fullness);
-    const shaped = Math.pow(smootherstep(warpedT), curvePow);
+    const postT = clamp((t - taperNorm) / Math.max(1e-6, 1 - taperNorm), 0, 1);
+    const postExp = lerp(0.75, 1.9, fullness);
+    const postCurve = Math.pow(smootherstep(postT), postExp);
 
-    factor = lerp(1.0, knifeRatio, shaped);
+    // 0.22 keeps the bow shoulder fuller before final run-in.
+    const phase = t < taperNorm
+      ? preCurve * 0.22
+      : 0.22 + postCurve * 0.78;
+
+    const bowCurve = smootherstep(phase);
+    factor = lerp(1.0, knifeRatio, bowCurve);
   }
 
   return halfBeam * Math.max(knifeRatio, factor);
