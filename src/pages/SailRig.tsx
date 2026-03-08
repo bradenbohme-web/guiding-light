@@ -222,7 +222,7 @@ const SailRig = () => {
             </div>
             <div>
               <h1 className="text-sm font-bold font-mono">Sail Rig Integration</h1>
-              <p className="text-[10px] text-muted-foreground">Mast • Boom • Sail • Ropes • Pulleys • Traveler</p>
+              <p className="text-[10px] text-muted-foreground">Mast • Boom • Sail • Ropes • Rope Horse • No Halyard (Sleeve Sail)</p>
             </div>
           </div>
         </div>
