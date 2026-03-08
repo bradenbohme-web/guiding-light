@@ -1,8 +1,8 @@
-// BoatGroupV2 - Contains V2 hull, transom/cockpit, rigging with wave bobbing and spray
+// BoatGroupV2 - Contains ultimate Laser hull, rigging with wave bobbing and spray
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { HullMeshV2 } from "./HullMeshV2";
+import { LaserHullUltimateModel } from "./LaserHullParametricUltimate";
 import { RiggingMesh } from "./RiggingMesh";
 import { BoatSpray } from "./BoatSpray";
 import { HullV2Params } from "@/lib/parametric/v2/types";
@@ -55,14 +55,10 @@ export function BoatGroupV2({
     timeRef.current += delta;
     const t = timeRef.current;
 
-    // Heave (up/down)
     const heave = Math.sin(t * waveParams.frequency * Math.PI * 2) * waveParams.amplitude;
-    // Roll (side-to-side rotation)
     const roll = Math.sin(t * waveParams.frequency * Math.PI * 2 * 0.7 + 0.5) * waveParams.rollAmplitude;
-    // Pitch (front-to-back rotation)
     const pitch = Math.sin(t * waveParams.frequency * Math.PI * 2 * 1.1 + 1.2) * waveParams.pitchAmplitude;
 
-    // Boat speed affects wave response - faster boat = less bobbing (planing)
     const speedFactor = Math.max(0.3, 1 - boatSpeed * 0.08);
 
     groupRef.current.position.y = heave * speedFactor;
@@ -70,19 +66,24 @@ export function BoatGroupV2({
     groupRef.current.rotation.x = pitch * speedFactor;
   });
 
-  // Bow spray emitter position - at the BOW (front/positive X)
+  // Bow spray emitter position
   const bowEmitter = useMemo(() => {
     return new THREE.Vector3(params.dimensions.length / 2 - 0.1, 0, 0);
   }, [params.dimensions.length]);
 
   return (
     <group ref={groupRef}>
-      {/* V2 Hull (5-piece construction) */}
-      <HullMeshV2
-        params={params}
-        resolution={resolution}
-        showWireframe={showWireframe}
-        highlightTarget={highlightTarget}
+      {/* Ultimate Laser Hull - proper cubic Bézier sections, real offset data */}
+      <LaserHullUltimateModel
+        params={{
+          length: params.dimensions.length,
+          beam: params.dimensions.beam,
+          stations: resolution === "high" ? 128 : resolution === "medium" ? 64 : 32,
+          sectionSamples: resolution === "high" ? 40 : resolution === "medium" ? 24 : 16,
+        }}
+        wireframe={showWireframe}
+        rotation={[0, -Math.PI / 2, 0]}
+        position={[0, 0, -0.15]}
       />
 
       {/* Rigging */}
