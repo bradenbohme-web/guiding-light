@@ -182,15 +182,15 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
   },
   bow: {
     edgeRake: 15,          // Bow edge tilts 15° forward in side view
-    taperStart: 0.5,       // Start taper at midpoint
-    taperPower: 2.0,       // Smooth taper
+    taperStart: 0.65,      // Taper accelerates past this point (smooth teardrop)
+    taperPower: 1.5,       // Fullness of bow (1=lean, 2+=full)
     knifeWidth: 0.02,      // 2cm knife edge width
   },
   beam: {
-    sternWidth: 0.85,
-    maxBeamPos: 0.45,
+    sternWidth: 0.82,
+    maxBeamPos: 0.40,      // Widest point ~40% from stern (Laser-like)
     sternBlend: 0.15,
-    interpolation: 'straight',
+    interpolation: 'balloon',  // Smooth sine rise from stern
   },
 };
 
