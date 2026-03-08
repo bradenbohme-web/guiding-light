@@ -1,1 +1,4 @@
 project_id = "vhpoyzcoijohdcvwzugl"
+
+[functions.hull-shape-review]
+verify_jwt = false
