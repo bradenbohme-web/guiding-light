@@ -15,16 +15,25 @@ import { HullParams, DEFAULT_HULL_PARAMS } from "@/lib/parametric/types";
 import { HullV2Params, DEFAULT_HULL_V2_PARAMS } from "@/lib/parametric/v2/types";
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING } from "@/lib/parametric/laserRigging";
 import { OceanSettings, DEFAULT_OCEAN_SETTINGS } from "@/lib/ocean/types";
+import { HullVersion } from "@/components/engine/BoatGroupV2";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Cpu, Settings, TrendingUp, Sailboat, Grid2X2, Image, Waves } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+const HULL_VERSIONS: { id: HullVersion; label: string; description: string }[] = [
+  { id: "parametric", label: "Parametric", description: "Catmull-Rom + Bézier sections" },
+  { id: "brep", label: "B-Rep", description: "OpenSCAD-derived solid" },
+  { id: "legacy", label: "Legacy", description: "V2 mesh generator" },
+];
+
 const Index = () => {
-  // Hull version toggle
-  const [useV2Hull, setUseV2Hull] = useState(true);
+  // Hull version
+  const [hullVersion, setHullVersion] = useState<HullVersion>("parametric");
+  const useV2Hull = hullVersion !== "legacy";
   
   // V1 Hull params
   const [params, setParams] = useState<HullParams>({ ...DEFAULT_HULL_PARAMS });
