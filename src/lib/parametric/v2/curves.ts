@@ -77,61 +77,41 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
     const shaped = applyInterpolationStyle(base, interpolation);
     factor = lerp(sternWidth, 1.0, shaped);
   } else {
-    // Rebuilt top-view bow law: shoulder hold -> transition -> short entry collapse.
+    // Single fair bow law (no staged shoulders / no neck):
+    // one monotonic C2 collapse from max-beam station to stem.
     const bowSpan = Math.max(1e-6, 1 - maxBeamPos);
     const t = clamp((uClamped - maxBeamPos) / bowSpan, 0, 1);
 
-    const shoulderU = clamp(
-      Math.max(taperStart, maxBeamPos + 0.05),
-      maxBeamPos + 0.05,
-      0.9
-    );
-    const entryStartU = clamp(
-      1 - entryLength,
-      shoulderU + 0.04,
-      0.97
-    );
+    // Taper timing control: higher taperStart carries width farther forward,
+    // but remains smooth (no piecewise phase boundaries).
+    const startNorm = clamp((taperStart - maxBeamPos) / bowSpan, 0.02, 0.92);
 
-    const shoulderNorm = clamp((shoulderU - maxBeamPos) / bowSpan, 0.05, 0.88);
-    const entryNorm = clamp((entryStartU - maxBeamPos) / bowSpan, shoulderNorm + 0.06, 0.98);
-
-    const fullness = clamp((taperPower - 0.3) / (3 - 0.3), 0, 1);
+    const fullness = clamp((taperPower - 0.5) / (3 - 0.5), 0, 1);
+    const entryNorm = clamp((entryLength - 0.04) / (0.2 - 0.04), 0, 1);
     const bluntness = clamp(noseBluntness, 0, 1);
 
-    // Laser-like shoulder carry: hold width forward, then collapse late.
-    const shoulderDrop = lerp(0.16, 0.05, fullness);
-    const shoulderTarget = 1 - shoulderDrop;
+    // Timing warp (always monotonic): controls where narrowing accelerates.
+    const taperGamma = lerp(0.9, 2.3, startNorm);
+    const entryGamma = lerp(1.25, 0.78, entryNorm); // shorter entry => stubbier nose
+    const warped = Math.pow(t, taperGamma * entryGamma);
 
-    const midDrop = lerp(0.36, 0.2, fullness);
-    const midTarget = clamp(shoulderTarget - midDrop, 0.24, shoulderTarget - 0.02);
+    // Shape exponent: fuller shoulder carry without creating inflection shelves.
+    const bodyExp = lerp(0.95, 2.25, fullness);
+    const collapse = Math.pow(smootherstep(warped), bodyExp);
 
-    const minTipRatio = Math.max(baseKnifeRatio, 0.014);
-    const tipRatio = lerp(
+    // Tip ratio: enforce physical, non-needle minimum width.
+    const minTipRatio = Math.max(baseKnifeRatio, 0.022);
+    const tipRatio = clamp(
+      minTipRatio + lerp(0, 0.14, bluntness),
       minTipRatio,
-      clamp(minTipRatio + 0.12, minTipRatio, 0.34),
-      bluntness
+      0.36
     );
 
-    if (t <= shoulderNorm) {
-      const ns = clamp(t / Math.max(1e-6, shoulderNorm), 0, 1);
-      const shoulderExp = lerp(0.9, 2.1, fullness);
-      const shoulderCurve = Math.pow(smootherstep(ns), shoulderExp);
-      factor = lerp(1.0, shoulderTarget, shoulderCurve);
-    } else if (t <= entryNorm) {
-      const ns = clamp((t - shoulderNorm) / Math.max(1e-6, entryNorm - shoulderNorm), 0, 1);
-      const midExp = lerp(1.2, 2.8, fullness);
-      const midCurve = Math.pow(smootherstep(ns), midExp);
-      factor = lerp(shoulderTarget, midTarget, midCurve);
-    } else {
-      const ns = clamp((t - entryNorm) / Math.max(1e-6, 1 - entryNorm), 0, 1);
-      const noseHoldExp = lerp(0.95, 2.4, bluntness);
-      const noseCurve = Math.pow(smootherstep(ns), noseHoldExp);
-      factor = lerp(midTarget, tipRatio, noseCurve);
-    }
+    factor = lerp(1.0, tipRatio, collapse);
   }
 
-  const minFactor = Math.max(baseKnifeRatio, 0.014);
-  return halfBeam * clamp(factor, minFactor, 1.05);
+  const minFactor = Math.max(baseKnifeRatio, 0.022);
+  return halfBeam * clamp(factor, minFactor, 1.0);
 }
 
 // ============================================
