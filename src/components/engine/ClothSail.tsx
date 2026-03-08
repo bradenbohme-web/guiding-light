@@ -1,7 +1,7 @@
 // Cloth-simulated Sail with wind and tension response
 // Battens are on the LEECH (outer free edge), not the luff
 // Window and battens follow the cloth simulation
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { LaserRiggingParams } from "@/lib/parametric/laserRigging";
