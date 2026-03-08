@@ -891,18 +891,10 @@ export function LaserHullUltimateModel({
 
       {params.debug && geo.referenceLines && (
         <>
-          <line geometry={geo.referenceLines.planUpper}>
-            <lineBasicMaterial color="#ff5050" />
-          </line>
-          <line geometry={geo.referenceLines.planLower}>
-            <lineBasicMaterial color="#ff5050" />
-          </line>
-          <line geometry={geo.referenceLines.sheer}>
-            <lineBasicMaterial color="#4cff88" />
-          </line>
-          <line geometry={geo.referenceLines.keel}>
-            <lineBasicMaterial color="#44a0ff" />
-          </line>
+          <Line points={geo.referenceLines.planUpper} color="#ff5050" lineWidth={1} />
+          <Line points={geo.referenceLines.planLower} color="#ff5050" lineWidth={1} />
+          <Line points={geo.referenceLines.sheer} color="#4cff88" lineWidth={1} />
+          <Line points={geo.referenceLines.keel} color="#44a0ff" lineWidth={1} />
         </>
       )}
     </group>
