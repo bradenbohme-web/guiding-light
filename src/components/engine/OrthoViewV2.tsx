@@ -393,7 +393,7 @@ export function OrthoViewV2({
     const newValue = dragStart.value + delta;
     const constrainedValue = constrainHullParam(point.paramKey, newValue, params);
     onParamChange(point.paramKey, constrainedValue);
-  }, [draggingPoint, dragStart, controlPoints, onParamChange]);
+  }, [draggingPoint, dragStart, controlPoints, onParamChange, params]);
 
   const handleMouseUp = useCallback(() => {
     setDraggingPoint(null);
