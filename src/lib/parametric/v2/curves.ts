@@ -51,18 +51,22 @@ function applyInterpolationStyle(t: number, style: InterpolationStyle): number {
 export function evalBeamV2(u: number, params: HullV2Params): number {
   const { beam } = params.dimensions;
   const { sternWidth, maxBeamPos, sternBlend, interpolation } = params.beam;
-  const { knifeWidth, taperStart, taperPower } = params.bow;
+  const {
+    knifeWidth,
+    taperStart,
+    taperPower,
+    entryLength = 0.16,
+    noseBluntness = 0.45,
+  } = params.bow;
   const halfBeam = beam / 2;
 
-  // Keep a practical minimum so the bow never devolves into a needle-like spike.
-  const knifeRatio = clamp(knifeWidth / halfBeam, 0.02, 0.25);
+  const baseKnifeRatio = clamp(knifeWidth / halfBeam, 0.005, 0.25);
 
   let factor: number;
 
   if (u <= maxBeamPos) {
     const t = clamp(u / Math.max(1e-6, maxBeamPos), 0, 1);
 
-    // low sternBlend -> faster rise, high sternBlend -> slower rise
     const blendNorm = clamp((sternBlend - 0.05) / 0.25, 0, 1);
     const sternShape = lerp(0.8, 2.4, blendNorm);
 
@@ -72,33 +76,50 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
   } else {
     const t = clamp((u - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos), 0, 1);
 
-    // Two-phase bow taper:
-    // 1) carry fullness after max beam,
-    // 2) accelerate convergence near the front.
     const taperNorm = clamp(
       (taperStart - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos),
-      0.1,
-      0.92
+      0.05,
+      0.88
     );
+
+    const entryStartU = clamp(1 - entryLength, maxBeamPos + 0.06, 0.98);
+    const rawEntryNorm = (entryStartU - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos);
+    const entryNorm = clamp(rawEntryNorm, taperNorm + 0.05, 0.98);
+
     const fullness = clamp((taperPower - 0.3) / (3 - 0.3), 0, 1);
+    const bluntness = clamp(noseBluntness, 0, 1);
 
-    const preT = clamp(t / Math.max(1e-6, taperNorm), 0, 1);
-    const preCurve = smootherstep(preT);
+    const shoulderDepth = lerp(0.14, 0.06, fullness);
+    const midTarget = lerp(0.62, 0.44, fullness);
 
-    const postT = clamp((t - taperNorm) / Math.max(1e-6, 1 - taperNorm), 0, 1);
-    const postExp = lerp(0.75, 1.9, fullness);
-    const postCurve = Math.pow(smootherstep(postT), postExp);
+    let phase: number;
 
-    // 0.08 keeps the shoulder full and shifts convergence to the final run-in.
-    const phase = t < taperNorm
-      ? preCurve * 0.08
-      : 0.08 + postCurve * 0.92;
+    if (t <= taperNorm) {
+      const ns = clamp(t / Math.max(1e-6, taperNorm), 0, 1);
+      phase = smootherstep(ns) * shoulderDepth;
+    } else if (t <= entryNorm) {
+      const ns = clamp((t - taperNorm) / Math.max(1e-6, entryNorm - taperNorm), 0, 1);
+      const midExp = lerp(0.9, 1.7, fullness);
+      const midCurve = Math.pow(smootherstep(ns), midExp);
+      phase = lerp(shoulderDepth, midTarget, midCurve);
+    } else {
+      const ns = clamp((t - entryNorm) / Math.max(1e-6, 1 - entryNorm), 0, 1);
+      const noseExp = lerp(1.6, 0.8, bluntness);
+      const noseCurve = Math.pow(smootherstep(ns), noseExp);
+      phase = lerp(midTarget, 1.0, noseCurve);
+    }
+
+    const tipRatio = lerp(
+      baseKnifeRatio,
+      clamp(baseKnifeRatio + 0.12, baseKnifeRatio, 0.32),
+      bluntness
+    );
 
     const bowCurve = smootherstep(phase);
-    factor = lerp(1.0, knifeRatio, bowCurve);
+    factor = lerp(1.0, tipRatio, bowCurve);
   }
 
-  return halfBeam * Math.max(knifeRatio, factor);
+  return halfBeam * Math.max(baseKnifeRatio, factor);
 }
 
 // ============================================

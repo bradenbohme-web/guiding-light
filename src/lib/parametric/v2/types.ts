@@ -110,8 +110,10 @@ export interface TransomParams {
 // SIMPLIFIED BOW PARAMS - No separate bow cap, just edge control
 export interface BowParams {
   edgeRake: number;        // Bow edge angle in side view (degrees) - forward/back tilt
-  taperStart: number;      // U position where taper begins (0-1)
-  taperPower: number;      // How aggressively bow tapers (1=linear, 2+=aggressive)
+  taperStart: number;      // U position where broad bow taper begins (0-1)
+  taperPower: number;      // Fullness carry through the shoulder region
+  entryLength: number;     // Final nose-run length as fraction of hull length
+  noseBluntness: number;   // 0-1: sharp entry to blunt/rounded entry
   knifeWidth: number;      // Minimum width at bow tip (m) - never zero
 }
 
@@ -182,13 +184,15 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
   },
   bow: {
     edgeRake: 15,
-    taperStart: 0.78,      // Keep shoulders broad longer; taper in final approach
-    taperPower: 2.1,       // Fuller carry, faster final convergence
-    knifeWidth: 0.02,      // Avoid excessive needle while retaining pointed entry
+    taperStart: 0.68,      // Shoulder release point
+    taperPower: 1.6,       // Shoulder fullness
+    entryLength: 0.16,     // Last ~16% of hull is dedicated nose run-in
+    noseBluntness: 0.45,   // Mid-blunt default, tunable either way
+    knifeWidth: 0.012,     // Physical stem width control
   },
   beam: {
     sternWidth: 0.84,
-    maxBeamPos: 0.52,      // Shorter bow-run taper, closer to Laser top-profile feel
+    maxBeamPos: 0.50,
     sternBlend: 0.15,
     interpolation: 'balloon',
   },
@@ -246,7 +250,7 @@ export const HULL_PARTS: Record<string, PartInfo> = {
     description: 'Where the V-hull sides converge to a knife edge. Not a separate piece - emerges from hull shape.',
     location: 'Forward extremity where hull sides meet',
     category: 'bow',
-    paramKeys: ['bow.edgeRake', 'bow.taperStart', 'bow.taperPower', 'bow.knifeWidth'],
+    paramKeys: ['bow.edgeRake', 'bow.taperStart', 'bow.taperPower', 'bow.entryLength', 'bow.noseBluntness', 'bow.knifeWidth'],
   },
   beam_curve: {
     id: 'beam_curve',
@@ -317,9 +321,11 @@ export const PARAM_GROUPS: ParamGroupDef[] = [
     icon: 'Navigation',
     description: 'How hull sides converge to knife edge',
     params: [
-      { key: 'bow.taperStart', label: 'Taper Accel Point', min: 0.55, max: 0.9, step: 0.01, tooltip: 'Where taper accelerates (higher=fuller bow, lower=leaner)', hoverTarget: 'bow_edge' },
-      { key: 'bow.taperPower', label: 'Bow Fullness', min: 0.3, max: 3, step: 0.1, tooltip: 'How full the bow stays (higher=fuller, rounder)', hoverTarget: 'bow_edge' },
-      { key: 'bow.knifeWidth', label: 'Knife Width', min: 0.01, max: 0.08, step: 0.005, unit: 'm', tooltip: 'Minimum width at bow tip', hoverTarget: 'bow_edge' },
+      { key: 'bow.taperStart', label: 'Taper Start', min: 0.45, max: 0.9, step: 0.01, tooltip: 'Where shoulder taper starts (higher=fuller bow shoulder)', hoverTarget: 'bow_edge' },
+      { key: 'bow.taperPower', label: 'Shoulder Fullness', min: 0.3, max: 3, step: 0.1, tooltip: 'How much width is carried through the bow shoulder', hoverTarget: 'bow_edge' },
+      { key: 'bow.entryLength', label: 'Entry Length', min: 0.06, max: 0.3, step: 0.01, tooltip: 'Length of final nose run-in (higher=longer point, lower=shorter entry)', hoverTarget: 'bow_edge' },
+      { key: 'bow.noseBluntness', label: 'Nose Bluntness', min: 0, max: 1, step: 0.01, tooltip: '0=sharp nose, 1=blunt rounded entry', hoverTarget: 'bow_edge' },
+      { key: 'bow.knifeWidth', label: 'Stem Width', min: 0.005, max: 0.08, step: 0.005, unit: 'm', tooltip: 'Physical width at bow tip', hoverTarget: 'bow_edge' },
       { key: 'bow.edgeRake', label: 'Edge Rake', min: -30, max: 30, step: 1, unit: '°', tooltip: 'Bow edge angle in side view (bottom hull only)', hoverTarget: 'bow_edge' },
     ],
   },
