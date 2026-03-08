@@ -38,7 +38,8 @@ export interface SailBattenParams {
   count: number;            // Laser has 4 battens
   positions: number[];      // Fractional positions along luff [0..1]
   lengths: number[];        // Length of each batten in meters
-  stiffness: number;        // 0..1
+  stiffness: number;        // Global fallback 0..1
+  stiffnesses: number[];    // Per-batten stiffness overrides 0..1
 }
 
 export interface SailWindowParams {
