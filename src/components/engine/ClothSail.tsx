@@ -492,6 +492,7 @@ export function ClothSail({
 
         const diff = p2.position.clone().sub(p1.position);
         const dist = diff.length();
+        if (dist < 1e-6) return;
         const correction = diff.multiplyScalar((dist - c.restLength) / dist * c.stiffness * 0.5);
 
         if (!p1.fixed) p1.position.add(correction);
