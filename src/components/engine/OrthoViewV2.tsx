@@ -106,6 +106,35 @@ interface ControlPoint {
   scale: number; // How much param changes per pixel
 }
 
+function clampParam(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function constrainHullParam(key: string, value: number, params: HullV2Params): number {
+  if (key === 'beam.maxBeamPos') {
+    return clampParam(value, 0.3, 0.6);
+  }
+
+  if (key === 'bow.taperStart') {
+    const minTaperStart = Math.max(params.beam.maxBeamPos + 0.05, 0.45);
+    return clampParam(value, minTaperStart, 0.82);
+  }
+
+  if (key === 'bow.entryLength') {
+    const maxEntryLength = Math.min(
+      0.2,
+      Math.max(0.04, 1 - Math.max(params.bow.taperStart, params.beam.maxBeamPos + 0.05) - 0.04)
+    );
+    return clampParam(value, 0.04, maxEntryLength);
+  }
+
+  if (key === 'bow.knifeWidth') {
+    return clampParam(value, 0.01, 0.08);
+  }
+
+  return value;
+}
+
 function getControlPointsForView(
   viewType: "top" | "side" | "front",
   params: HullV2Params,
@@ -115,7 +144,10 @@ function getControlPointsForView(
   const points: ControlPoint[] = [];
   
   if (viewType === "top") {
-    const bowEntryU = Math.min(0.98, Math.max(params.bow.taperStart + 0.03, 1 - (params.bow.entryLength ?? 0.16)));
+    const clampedMaxBeamPos = clampParam(params.beam.maxBeamPos, 0.3, 0.6);
+    const clampedTaperStart = clampParam(params.bow.taperStart, Math.max(clampedMaxBeamPos + 0.05, 0.45), 0.82);
+    const clampedEntryLength = clampParam(params.bow.entryLength ?? 0.16, 0.04, 0.2);
+    const bowEntryU = Math.min(0.98, Math.max(clampedTaperStart + 0.04, 1 - clampedEntryLength));
 
     const topControls: Array<{
       id: string;
@@ -126,8 +158,8 @@ function getControlPointsForView(
       scale: number;
     }> = [
       { id: 'beam-stern', u: 0, paramKey: 'beam.sternWidth', label: 'Stern', direction: 'y', scale: 0.01 },
-      { id: 'beam-max', u: params.beam.maxBeamPos, paramKey: 'beam.maxBeamPos', label: 'Max Beam', direction: 'x', scale: 0.01 / length },
-      { id: 'bow-taper-start', u: params.bow.taperStart, paramKey: 'bow.taperStart', label: 'Taper Start', direction: 'x', scale: 0.01 / length },
+      { id: 'beam-max', u: clampedMaxBeamPos, paramKey: 'beam.maxBeamPos', label: 'Max Beam', direction: 'x', scale: 0.01 / length },
+      { id: 'bow-taper-start', u: clampedTaperStart, paramKey: 'bow.taperStart', label: 'Taper Start', direction: 'x', scale: 0.01 / length },
       { id: 'bow-entry', u: bowEntryU, paramKey: 'bow.entryLength', label: 'Entry Length', direction: 'x', scale: -0.01 / length },
       { id: 'bow-edge', u: 1, paramKey: 'bow.knifeWidth', label: 'Stem Width', direction: 'y', scale: 0.01 },
     ];
