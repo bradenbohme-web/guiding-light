@@ -49,6 +49,8 @@ export function ClothSail({
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const windowGeometryRef = useRef<THREE.BufferGeometry | null>(null);
+  const battenMeshRefs = useRef<THREE.Mesh[]>([]);
+  const pointsRef = useRef<ClothPoint[]>([]);
   const pointsRef = useRef<ClothPoint[]>([]);
 
   const { luffLength, footLength, clothSegmentsWidth, clothSegmentsHeight } = rigging.sail;
