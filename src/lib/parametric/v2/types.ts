@@ -110,8 +110,10 @@ export interface TransomParams {
 // SIMPLIFIED BOW PARAMS - No separate bow cap, just edge control
 export interface BowParams {
   edgeRake: number;        // Bow edge angle in side view (degrees) - forward/back tilt
-  taperStart: number;      // U position where taper begins (0-1)
-  taperPower: number;      // How aggressively bow tapers (1=linear, 2+=aggressive)
+  taperStart: number;      // U position where broad bow taper begins (0-1)
+  taperPower: number;      // Fullness carry through the shoulder region
+  entryLength: number;     // Final nose-run length as fraction of hull length
+  noseBluntness: number;   // 0-1: sharp entry to blunt/rounded entry
   knifeWidth: number;      // Minimum width at bow tip (m) - never zero
 }
 
