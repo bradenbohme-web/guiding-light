@@ -88,7 +88,12 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
     const L = 1 / (1 + Math.exp(-k * (t - center)));
     const L0 = 1 / (1 + Math.exp(-k * (0 - center)));
     const L1 = 1 / (1 + Math.exp(-k * (1 - center)));
-    const shaped = clamp((L - L0) / Math.max(1e-6, L1 - L0), 0, 1);
+    const logisticShaped = clamp((L - L0) / Math.max(1e-6, L1 - L0), 0, 1);
+
+    // Blend in a small linear component so taper always progresses
+    // (prevents long parallel shoulders in plan view)
+    const linearWeight = lerp(0.35, 0.1, fullness);
+    const shaped = clamp(lerp(logisticShaped, t, linearWeight), 0, 1);
 
     factor = lerp(1.0, knifeRatio, shaped);
   }

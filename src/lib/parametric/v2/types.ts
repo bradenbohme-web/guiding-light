@@ -182,8 +182,8 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
   },
   bow: {
     edgeRake: 15,          // Bow edge tilts 15° forward in side view
-    taperStart: 0.65,      // Taper accelerates past this point (smooth teardrop)
-    taperPower: 1.5,       // Fullness of bow (1=lean, 2+=full)
+    taperStart: 0.52,      // Earlier taper for fair Laser-like planform
+    taperPower: 1.2,       // Balanced default fullness
     knifeWidth: 0.02,      // 2cm knife edge width
   },
   beam: {
