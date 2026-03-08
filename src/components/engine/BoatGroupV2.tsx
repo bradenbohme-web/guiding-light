@@ -91,7 +91,20 @@ export function BoatGroupV2({
         />
       )}
 
-      {hullVersion === "brep" && (
+      {hullVersion === "v3" && (
+        <LaserHullV3Model
+          params={{
+            length: params.dimensions.length,
+            beam: params.dimensions.beam,
+            stations: resStations,
+            sectionSamples: resSections,
+          }}
+          wireframe={showWireframe}
+          rotation={[-Math.PI / 2, 0, -Math.PI / 2]}
+          position={[-params.dimensions.length / 2, 0, 0]}
+        />
+      )}
+
         <LaserHullBRepModel
           params={{
             nx: resStations,

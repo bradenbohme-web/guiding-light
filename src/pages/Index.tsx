@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 
 const HULL_VERSIONS: { id: HullVersion; label: string; description: string }[] = [
   { id: "parametric", label: "Parametric", description: "Catmull-Rom + Bézier sections" },
+  { id: "v3", label: "V3", description: "Monotone cubic + lofted cockpit" },
   { id: "brep", label: "B-Rep", description: "OpenSCAD-derived solid" },
   { id: "legacy", label: "Legacy", description: "V2 mesh generator" },
 ];
