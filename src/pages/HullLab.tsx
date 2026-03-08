@@ -71,8 +71,7 @@ export default function HullLab() {
 
   const outlinePath = `M ${topPoints.join(" L ")} L ${bottomPoints.join(" L ")} Z`;
 
-  const setNestedValue = (path: string, value: number) => {
-    const [scope, prop] = path.split(".") as ["beam" | "bow", string];
+  const setNestedValue = (scope: "beam" | "bow", prop: string, value: number) => {
     setParams((prev) => ({
       ...prev,
       [scope]: {
