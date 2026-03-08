@@ -124,25 +124,24 @@ const Index = () => {
           </Link>
         </div>
         
-        {/* Hull Version Toggle */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-1.5">
-            <span className={cn(
-              "text-xs font-mono transition-colors",
-              !useV2Hull ? "text-foreground" : "text-muted-foreground"
-            )}>V1</span>
-            <Switch 
-              checked={useV2Hull} 
-              onCheckedChange={setUseV2Hull}
-              className="data-[state=checked]:bg-primary"
-            />
-            <span className={cn(
-              "text-xs font-mono transition-colors",
-              useV2Hull ? "text-foreground" : "text-muted-foreground"
-            )}>V2</span>
+        {/* Hull Version Switcher */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
+            {HULL_VERSIONS.map((v) => (
+              <Button
+                key={v.id}
+                variant={hullVersion === v.id ? "default" : "ghost"}
+                size="sm"
+                className="text-xs font-mono h-7 px-2.5"
+                onClick={() => setHullVersion(v.id)}
+                title={v.description}
+              >
+                {v.label}
+              </Button>
+            ))}
           </div>
-          <Badge variant={useV2Hull ? "default" : "secondary"} className="font-mono text-xs">
-            {useV2Hull ? "Hull V2 - 5 Piece" : "Hull V1 - Legacy"}
+          <Badge variant="default" className="font-mono text-xs">
+            {HULL_VERSIONS.find((v) => v.id === hullVersion)?.description}
           </Badge>
         </div>
       </header>
