@@ -39,7 +39,6 @@ export function TravelerSystem({ traveler, showWireframe = false, highlight = fa
   }, [traveler.trackHalfSpan]);
 
   const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
-  const clampedZ = THREE.MathUtils.clamp(traveler.carZ, -traveler.trackHalfSpan, traveler.trackHalfSpan);
 
   return (
     <group position={[traveler.x, traveler.y, 0]}>
@@ -64,7 +63,7 @@ export function TravelerSystem({ traveler, showWireframe = false, highlight = fa
       ))}
 
       {/* Traveling block on the rope horse */}
-      <group position={[0, -0.01, clampedZ]}>
+      <group position={[0, -0.01, traveler.carZ]}>
         {/* Block body */}
         <mesh>
           <boxGeometry args={[0.04, 0.035, 0.03]} />

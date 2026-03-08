@@ -44,7 +44,11 @@ function MastMesh({ rigging, showWireframe, highlight }: { rigging: LaserRigging
   return (
     <mesh
       geometry={geometry}
-      position={[rigging.mast.position.x, rigging.mast.height / 2 + 0.12, rigging.mast.position.z]}
+      position={[
+        rigging.mast.position.x,
+        rigging.mast.position.y + rigging.mast.height / 2,
+        rigging.mast.position.z,
+      ]}
     >
       <meshStandardMaterial
         color={rigging.mast.color}
@@ -80,7 +84,7 @@ function BoomMesh({
 
   return (
     <group
-      position={[rigging.mast.position.x, gooseneckY, 0]}
+      position={[rigging.boom.position.x, rigging.boom.position.y, rigging.boom.position.z]}
       rotation={[0, angle, 0]}
     >
       <mesh
@@ -331,18 +335,14 @@ function PulleyMesh({
     const pos = pulley.position.clone();
 
     if (pulley.attach === "boom") {
-      const rotated = new THREE.Vector3(pos.x, pos.y, pos.z);
-      rotated.applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
-      rotated.x += rigging.mast.position.x;
-      rotated.y += rigging.boom.gooseneckHeight;
-      return rotated;
-    } else if (pulley.attach === "mast") {
-      return new THREE.Vector3(
-        rigging.mast.position.x + pos.x,
-        pos.y,
-        pos.z
-      );
+      const rotated = pos.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
+      return rotated.add(rigging.boom.position.clone());
     }
+
+    if (pulley.attach === "mast") {
+      return pos.clone().add(rigging.mast.position.clone());
+    }
+
     return pos;
   }, [pulley, boomAngle, rigging]);
 

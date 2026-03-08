@@ -297,7 +297,7 @@ export const DEFAULT_LASER_RIGGING: LaserRiggingParams = {
       enabled: true,
       position: { u: 0.4, v: 0.35 },
       size: { width: 0.35, height: 0.45 },
-      color: "rgba(200, 220, 255, 0.3)"
+      color: "hsl(210, 100%, 92%)"
     },
     clothSegmentsWidth: 18,
     clothSegmentsHeight: 24,
