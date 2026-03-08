@@ -82,8 +82,8 @@ export function BoatGroupV2({
           sectionSamples: resolution === "high" ? 40 : resolution === "medium" ? 24 : 16,
         }}
         wireframe={showWireframe}
-        rotation={[0, -Math.PI / 2, 0]}
-        position={[0, 0, -0.15]}
+        rotation={[-Math.PI / 2, 0, -Math.PI / 2]}
+        position={[-params.dimensions.length / 2, 0, 0]}
       />
 
       {/* Rigging */}
