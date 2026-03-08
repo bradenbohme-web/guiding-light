@@ -124,22 +124,51 @@ export function SailEditor({ rigging, onChange }: SailEditorProps) {
             </div>
             {rigging.sail.battens.enabled && (
               <>
-                <SailSlider label="Stiffness" value={rigging.sail.battens.stiffness} min={0} max={1} step={0.01} onChange={v => updateBattens("stiffness", v)} />
+                <SailSlider label="Global Stiffness" value={rigging.sail.battens.stiffness} min={0} max={1} step={0.01} onChange={v => updateBattens("stiffness", v)} />
                 <SailSlider label="Count" value={rigging.sail.battens.count} min={1} max={8} step={1} onChange={v => updateBattens("count", v)} />
+                <Separator />
+                <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">Per-Batten Adjustment</Label>
                 {rigging.sail.battens.positions.map((pos, i) => (
-                  <SailSlider
-                    key={i}
-                    label={`Batten ${i + 1} Pos`}
-                    value={pos}
-                    min={0.1}
-                    max={0.95}
-                    step={0.01}
-                    onChange={v => {
-                      const newPos = [...rigging.sail.battens.positions];
-                      newPos[i] = v;
-                      updateBattens("positions", v); // simplified - full impl would update array
-                    }}
-                  />
+                  <div key={i} className="space-y-2 pl-2 border-l-2 border-primary/20">
+                    <Label className="text-[10px] font-semibold text-muted-foreground">Batten {i + 1}</Label>
+                    <SailSlider
+                      label="Position"
+                      value={pos}
+                      min={0.1}
+                      max={0.95}
+                      step={0.01}
+                      onChange={v => {
+                        const newPos = [...rigging.sail.battens.positions];
+                        newPos[i] = v;
+                        onChange({ ...rigging, sail: { ...rigging.sail, battens: { ...rigging.sail.battens, positions: newPos } } });
+                      }}
+                    />
+                    <SailSlider
+                      label="Length"
+                      value={rigging.sail.battens.lengths[i] ?? 0.5}
+                      min={0.1}
+                      max={1.5}
+                      step={0.01}
+                      unit="m"
+                      onChange={v => {
+                        const newLengths = [...rigging.sail.battens.lengths];
+                        newLengths[i] = v;
+                        onChange({ ...rigging, sail: { ...rigging.sail, battens: { ...rigging.sail.battens, lengths: newLengths } } });
+                      }}
+                    />
+                    <SailSlider
+                      label="Stiffness"
+                      value={rigging.sail.battens.stiffnesses?.[i] ?? rigging.sail.battens.stiffness}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      onChange={v => {
+                        const newStiffnesses = [...(rigging.sail.battens.stiffnesses || rigging.sail.battens.positions.map(() => rigging.sail.battens.stiffness))];
+                        newStiffnesses[i] = v;
+                        onChange({ ...rigging, sail: { ...rigging.sail, battens: { ...rigging.sail.battens, stiffnesses: newStiffnesses } } });
+                      }}
+                    />
+                  </div>
                 ))}
               </>
             )}

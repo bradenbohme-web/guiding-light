@@ -255,8 +255,9 @@ export function ClothSail({
       battenPtIndices.forEach((battenPts, bi) => {
         if (!battenPts || battenPts.length < 3) return;
 
-        // Stiffness in 0..1 range from rigging, map to strong constraint
-        const k = 0.45 + (rigging.sail.battens.stiffness ?? 0.8) * 0.3;
+        // Per-batten stiffness with fallback
+        const rawStiff = rigging.sail.battens.stiffnesses?.[bi] ?? rigging.sail.battens.stiffness ?? 0.8;
+        const k = 0.45 + rawStiff * 0.3;
 
         for (let ii = 0; ii < battenPts.length - 1; ii++) {
           const p1 = battenPts[ii];
