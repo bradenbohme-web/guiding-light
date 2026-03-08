@@ -172,6 +172,11 @@ const Workshop = () => {
             </div>
           </div>
         </div>
+        <Link to="/hull-lab">
+          <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+            🧪 Hull Lab
+          </Button>
+        </Link>
       </header>
 
       {/* Main Content */}
