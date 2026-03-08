@@ -569,7 +569,7 @@ export function ClothSail({
 
   return (
     <group
-      position={[rigging.mast.position.x, gooseneckY, 0]}
+      position={[gooseneckPosition.x, gooseneckPosition.y, gooseneckPosition.z]}
       rotation={[0, boomAngle, 0]}
     >
       <mesh ref={meshRef} geometry={geometry}>

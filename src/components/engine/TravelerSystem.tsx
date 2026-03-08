@@ -63,7 +63,7 @@ export function TravelerSystem({ traveler, showWireframe = false, highlight = fa
       ))}
 
       {/* Traveling block on the rope horse */}
-      <group position={[0, -0.01, clampedZ]}>
+      <group position={[0, -0.01, traveler.carZ]}>
         {/* Block body */}
         <mesh>
           <boxGeometry args={[0.04, 0.035, 0.03]} />

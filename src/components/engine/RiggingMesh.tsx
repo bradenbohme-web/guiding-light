@@ -335,18 +335,14 @@ function PulleyMesh({
     const pos = pulley.position.clone();
 
     if (pulley.attach === "boom") {
-      const rotated = new THREE.Vector3(pos.x, pos.y, pos.z);
-      rotated.applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
-      rotated.x += rigging.mast.position.x;
-      rotated.y += rigging.boom.gooseneckHeight;
-      return rotated;
-    } else if (pulley.attach === "mast") {
-      return new THREE.Vector3(
-        rigging.mast.position.x + pos.x,
-        pos.y,
-        pos.z
-      );
+      const rotated = pos.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
+      return rotated.add(rigging.boom.position.clone());
     }
+
+    if (pulley.attach === "mast") {
+      return pos.clone().add(rigging.mast.position.clone());
+    }
+
     return pos;
   }, [pulley, boomAngle, rigging]);
 
