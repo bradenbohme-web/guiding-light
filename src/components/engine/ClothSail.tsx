@@ -1,7 +1,7 @@
 // Cloth-simulated Sail with wind and tension response
 // Battens are on the LEECH (outer free edge), not the luff
 // Window and battens follow the cloth simulation
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { LaserRiggingParams } from "@/lib/parametric/laserRigging";
@@ -66,6 +66,19 @@ export function ClothSail({
     // Batten positions (v = vertical position on sail, u=1 is leech)
     const battenPositions = rigging.sail.battens.positions;
     const battenLengths = rigging.sail.battens.lengths;
+
+    // Snap each batten to exactly one cloth row to prevent cross-row zigzag constraints
+    const battenRows = rigging.sail.battens.enabled
+      ? battenPositions.map((battenV, bi) => {
+          const row = THREE.MathUtils.clamp(Math.round(battenV * segH), 0, segH);
+          const rowV = row / segH;
+          const widthAtRow = footLength * (1 - rowV * 0.95);
+          const battenLen = Math.max(0, battenLengths[bi] || 0.5);
+          const battenUStart = Math.max(0, 1 - battenLen / Math.max(widthAtRow, 1e-6));
+
+          return { row, battenUStart };
+        })
+      : [];
     
     // Window UV position
     const windowU = rigging.sail.window.position.u;
@@ -92,25 +105,19 @@ export function ClothSail({
         const isFixed = isLuff || isFoot;
 
         // Calculate batten stiffness for this point
-        // Battens are on the LEECH edge (u close to 1)
+        // Battens are on the LEECH edge (u close to 1), pinned to one row each
         let battenStiffness = 0;
         if (rigging.sail.battens.enabled) {
-          for (let bi = 0; bi < battenPositions.length; bi++) {
-            const battenV = battenPositions[bi];
-            const battenLen = battenLengths[bi] || 0.5;
-            const battenUStart = 1 - (battenLen / widthAtHeight); // Where batten starts from leech
+          for (let bi = 0; bi < battenRows.length; bi++) {
+            const { row, battenUStart } = battenRows[bi];
 
-            // Check if this point is on or near this batten
-            if (Math.abs(v - battenV) < 0.05) {
-              // Within batten row
-              if (u >= battenUStart) {
-                // Within batten extent
-                battenStiffness = rigging.sail.battens.stiffness * 2;
+            // Single-row membership prevents zigzagging across adjacent rows
+            if (j === row && u >= battenUStart) {
+              battenStiffness = Math.max(battenStiffness, rigging.sail.battens.stiffness * 2);
 
-                // Track batten points
-                if (!battenPtIndices[bi]) battenPtIndices[bi] = [];
-                battenPtIndices[bi].push(j * (segW + 1) + i);
-              }
+              // Track batten points in row order for stable constraints
+              if (!battenPtIndices[bi]) battenPtIndices[bi] = [];
+              battenPtIndices[bi].push(j * (segW + 1) + i);
             }
           }
         }
@@ -485,6 +492,7 @@ export function ClothSail({
 
         const diff = p2.position.clone().sub(p1.position);
         const dist = diff.length();
+        if (dist < 1e-6) return;
         const correction = diff.multiplyScalar((dist - c.restLength) / dist * c.stiffness * 0.5);
 
         if (!p1.fixed) p1.position.add(correction);
