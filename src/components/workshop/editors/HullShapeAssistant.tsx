@@ -16,9 +16,7 @@ interface HullShapeAssistantProps {
 
 interface HullShapeReviewResponse {
   analysis: string;
-  visualSummary?: string;
   model: string;
-  preprocessorModel?: string;
 }
 
 function sampleBeamStations(params: HullV2Params) {
@@ -207,20 +205,7 @@ export function HullShapeAssistant({ params }: HullShapeAssistantProps) {
         {/* Results */}
         {result && (
           <div className="space-y-2 rounded-md border border-border bg-background/40 p-3">
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="text-[10px]">{result.model}</Badge>
-              {result.preprocessorModel && (
-                <Badge variant="outline" className="text-[10px]">
-                  visual: {result.preprocessorModel}
-                </Badge>
-              )}
-            </div>
-            {result.visualSummary && result.visualSummary !== "No screenshot provided." && (
-              <div className="border-l-2 border-primary/30 pl-2">
-                <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Visual Pre-pass</p>
-                <p className="text-xs text-muted-foreground whitespace-pre-wrap">{result.visualSummary}</p>
-              </div>
-            )}
+            <Badge variant="secondary" className="text-[10px]">{result.model}</Badge>
             <pre className="text-xs whitespace-pre-wrap text-foreground font-sans leading-relaxed max-h-[500px] overflow-auto">
               {result.analysis}
             </pre>
