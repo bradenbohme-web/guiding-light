@@ -181,16 +181,16 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
     flatness: 0.3,
   },
   bow: {
-    edgeRake: 15,          // Bow edge tilts 15° forward in side view
-    taperStart: 0.48,      // Earlier fair taper for Laser-like planform
-    taperPower: 1.0,       // Neutral fullness default
-    knifeWidth: 0.01,      // 1cm default tip width (less stem plateau)
+    edgeRake: 15,
+    taperStart: 0.70,      // Hold width forward, then converge in the last third
+    taperPower: 1.8,       // Fuller carry before final run-in
+    knifeWidth: 0.03,      // Prevent needle-like bow in plan view
   },
   beam: {
-    sternWidth: 0.82,
-    maxBeamPos: 0.40,      // Widest point ~40% from stern (Laser-like)
+    sternWidth: 0.84,
+    maxBeamPos: 0.50,      // Move max beam forward for shorter Laser-style entry taper
     sternBlend: 0.15,
-    interpolation: 'balloon',  // Smooth sine rise from stern
+    interpolation: 'balloon',
   },
 };
 
