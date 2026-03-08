@@ -130,7 +130,9 @@ function MainsheetRope({
   );
 }
 
-// Vang rope
+// Vang rope — Laser vang uses a 6:1 cascade (3:1 upper x 2:1 lower)
+// Upper: rope from boom block → mast base block → boom block (3:1)
+// Lower: fine-tune 2:1 with cleat
 function VangRope({
   rigging,
   boomAngle,
@@ -143,22 +145,34 @@ function VangRope({
   const geometry = useMemo(() => {
     const gooseneckY = rigging.boom.gooseneckHeight;
     const mastX = rigging.mast.position.x;
+    const sag = (1 - rigging.vangTension) * 0.06;
 
-    const vangBoomLocal = new THREE.Vector3(-0.5, -0.03, 0);
-    vangBoomLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
-    const vangBoom = new THREE.Vector3(
-      mastX + vangBoomLocal.x,
-      gooseneckY + vangBoomLocal.y,
-      vangBoomLocal.z
-    );
+    // Boom block (upper) — attached ~0.5m aft of gooseneck
+    const boomBlockLocal = new THREE.Vector3(-0.5, -0.03, 0);
+    boomBlockLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
+    const boomBlock = new THREE.Vector3(mastX + boomBlockLocal.x, gooseneckY + boomBlockLocal.y, boomBlockLocal.z);
 
-    const vangBase = new THREE.Vector3(0.04, 0.08, 0);
+    // Mast base bracket (lower)
+    const mastBase = new THREE.Vector3(mastX + 0.02, 0.20, 0);
 
-    const sag = (1 - rigging.vangTension) * 0.1;
-    const points = calculateCatenary(vangBoom, vangBase, sag, 16);
+    // 6:1 cascade routing: boom → base → boom → base → boom → base → cleat
+    const points: THREE.Vector3[] = [];
+    const offset = 0.012; // Slight offset for each pass to avoid overlap
+
+    // Pass 1: boom block down to mast base
+    points.push(...calculateCatenary(boomBlock, mastBase, sag, 8));
+    // Pass 2: back up to boom (slightly offset)
+    const bb2 = boomBlock.clone().add(new THREE.Vector3(0, 0, offset));
+    points.push(...calculateCatenary(mastBase, bb2, sag * 0.8, 8));
+    // Pass 3: back down to base (offset other way)
+    const mb2 = mastBase.clone().add(new THREE.Vector3(0, 0, -offset));
+    points.push(...calculateCatenary(bb2, mb2, sag * 0.6, 8));
+    // Tail to cleat
+    const cleat = new THREE.Vector3(mastX + 0.06, 0.15, 0.03);
+    points.push(...calculateCatenary(mb2, cleat, sag * 0.4, 6));
 
     const curve = new THREE.CatmullRomCurve3(points);
-    return new THREE.TubeGeometry(curve, 24, 0.003, 6, false);
+    return new THREE.TubeGeometry(curve, points.length, 0.003, 6, false);
   }, [rigging, boomAngle]);
 
   const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
