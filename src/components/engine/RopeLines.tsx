@@ -130,7 +130,9 @@ function MainsheetRope({
   );
 }
 
-// Vang rope
+// Vang rope — Laser vang uses a 6:1 cascade (3:1 upper x 2:1 lower)
+// Upper: rope from boom block → mast base block → boom block (3:1)
+// Lower: fine-tune 2:1 with cleat
 function VangRope({
   rigging,
   boomAngle,
@@ -143,22 +145,34 @@ function VangRope({
   const geometry = useMemo(() => {
     const gooseneckY = rigging.boom.gooseneckHeight;
     const mastX = rigging.mast.position.x;
+    const sag = (1 - rigging.vangTension) * 0.06;
 
-    const vangBoomLocal = new THREE.Vector3(-0.5, -0.03, 0);
-    vangBoomLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
-    const vangBoom = new THREE.Vector3(
-      mastX + vangBoomLocal.x,
-      gooseneckY + vangBoomLocal.y,
-      vangBoomLocal.z
-    );
+    // Boom block (upper) — attached ~0.5m aft of gooseneck
+    const boomBlockLocal = new THREE.Vector3(-0.5, -0.03, 0);
+    boomBlockLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
+    const boomBlock = new THREE.Vector3(mastX + boomBlockLocal.x, gooseneckY + boomBlockLocal.y, boomBlockLocal.z);
 
-    const vangBase = new THREE.Vector3(0.04, 0.08, 0);
+    // Mast base bracket (lower)
+    const mastBase = new THREE.Vector3(mastX + 0.02, 0.20, 0);
 
-    const sag = (1 - rigging.vangTension) * 0.1;
-    const points = calculateCatenary(vangBoom, vangBase, sag, 16);
+    // 6:1 cascade routing: boom → base → boom → base → boom → base → cleat
+    const points: THREE.Vector3[] = [];
+    const offset = 0.012; // Slight offset for each pass to avoid overlap
+
+    // Pass 1: boom block down to mast base
+    points.push(...calculateCatenary(boomBlock, mastBase, sag, 8));
+    // Pass 2: back up to boom (slightly offset)
+    const bb2 = boomBlock.clone().add(new THREE.Vector3(0, 0, offset));
+    points.push(...calculateCatenary(mastBase, bb2, sag * 0.8, 8));
+    // Pass 3: back down to base (offset other way)
+    const mb2 = mastBase.clone().add(new THREE.Vector3(0, 0, -offset));
+    points.push(...calculateCatenary(bb2, mb2, sag * 0.6, 8));
+    // Tail to cleat
+    const cleat = new THREE.Vector3(mastX + 0.06, 0.15, 0.03);
+    points.push(...calculateCatenary(mb2, cleat, sag * 0.4, 6));
 
     const curve = new THREE.CatmullRomCurve3(points);
-    return new THREE.TubeGeometry(curve, 24, 0.003, 6, false);
+    return new THREE.TubeGeometry(curve, points.length, 0.003, 6, false);
   }, [rigging, boomAngle]);
 
   const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
@@ -170,7 +184,9 @@ function VangRope({
   );
 }
 
-// Cunningham rope
+// Cunningham rope — Laser cunningham uses a 6:1 purchase
+// Routes through a cringle on the sail tack, down to a block on the vang bracket,
+// back up, with tail led aft to a cleat on the deck
 function CunninghamRope({
   rigging,
   boomAngle,
@@ -183,15 +199,30 @@ function CunninghamRope({
   const geometry = useMemo(() => {
     const mastX = rigging.mast.position.x;
     const gooseneckY = rigging.boom.gooseneckHeight;
+    const sag = (1 - rigging.cunninghamTension) * 0.05;
+    const offset = 0.008;
 
-    const sailAttach = new THREE.Vector3(mastX + 0.02, gooseneckY + 0.15, 0);
-    const cleat = new THREE.Vector3(0.08, 0.1, 0);
+    // Cunningham cringle (sail tack, just above gooseneck)
+    const cringle = new THREE.Vector3(mastX + 0.03, gooseneckY + 0.10, 0);
+    // Deck block (near mast base)
+    const deckBlock = new THREE.Vector3(mastX + 0.04, 0.14, 0.02);
 
-    const sag = (1 - rigging.cunninghamTension) * 0.08;
-    const points = calculateCatenary(sailAttach, cleat, sag, 12);
+    const points: THREE.Vector3[] = [];
+
+    // Pass 1: cringle → deck block
+    points.push(...calculateCatenary(cringle, deckBlock, sag, 8));
+    // Pass 2: deck → cringle (offset)
+    const cr2 = cringle.clone().add(new THREE.Vector3(0, 0, offset));
+    points.push(...calculateCatenary(deckBlock, cr2, sag * 0.7, 8));
+    // Pass 3: cringle → deck (offset)
+    const db2 = deckBlock.clone().add(new THREE.Vector3(0, 0, -offset));
+    points.push(...calculateCatenary(cr2, db2, sag * 0.5, 8));
+    // Tail to cleat
+    const cleat = new THREE.Vector3(mastX + 0.08, 0.10, 0.04);
+    points.push(...calculateCatenary(db2, cleat, sag * 0.3, 6));
 
     const curve = new THREE.CatmullRomCurve3(points);
-    return new THREE.TubeGeometry(curve, 18, 0.0025, 6, false);
+    return new THREE.TubeGeometry(curve, points.length, 0.0025, 6, false);
   }, [rigging, boomAngle]);
 
   const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
@@ -249,30 +280,40 @@ function OuthaulRope({
   );
 }
 
-// Halyard rope
-function HalyardRope({
+// Clew Tie-Down rope (secures clew to boom end)
+function ClewTieDown({
   rigging,
+  boomAngle,
   highlight
 }: {
   rigging: LaserRiggingParams;
+  boomAngle: number;
   highlight: boolean;
 }) {
   const geometry = useMemo(() => {
-    const mastX = rigging.mast.position.x;
-    const masthead = new THREE.Vector3(mastX, rigging.mast.height + 0.1, 0);
     const gooseneckY = rigging.boom.gooseneckHeight;
-    const sailHead = new THREE.Vector3(mastX + 0.05, gooseneckY + rigging.sail.luffLength, 0);
+    const mastX = rigging.mast.position.x;
 
-    const points = [masthead, sailHead];
+    // Clew position (sail corner at boom end)
+    const clewLocal = new THREE.Vector3(-rigging.boom.length + 0.05, 0.04, 0);
+    clewLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
+    const clew = new THREE.Vector3(mastX + clewLocal.x, gooseneckY + clewLocal.y, clewLocal.z);
+
+    // Boom end attachment
+    const boomEndLocal = new THREE.Vector3(-rigging.boom.length, 0, 0);
+    boomEndLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
+    const boomEnd = new THREE.Vector3(mastX + boomEndLocal.x, gooseneckY + boomEndLocal.y, boomEndLocal.z);
+
+    const points = calculateCatenary(clew, boomEnd, 0.01, 8);
     const curve = new THREE.CatmullRomCurve3(points);
-    return new THREE.TubeGeometry(curve, 8, 0.003, 6, false);
-  }, [rigging]);
+    return new THREE.TubeGeometry(curve, 12, 0.002, 6, false);
+  }, [rigging, boomAngle]);
 
   const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
 
   return (
     <mesh geometry={geometry}>
-      <meshStandardMaterial color="#666666" roughness={0.6} metalness={0.15} emissive={emissive} emissiveIntensity={highlight ? 0.5 : 0} />
+      <meshStandardMaterial color="#888888" roughness={0.7} metalness={0.1} emissive={emissive} emissiveIntensity={highlight ? 0.5 : 0} />
     </mesh>
   );
 }
@@ -290,7 +331,8 @@ export function RopeLines({
       <VangRope rigging={rigging} boomAngle={boomAngle} highlight={highlight} />
       <CunninghamRope rigging={rigging} boomAngle={boomAngle} highlight={highlight} />
       <OuthaulRope rigging={rigging} boomAngle={boomAngle} highlight={highlight} />
-      <HalyardRope rigging={rigging} highlight={highlight} />
+      <ClewTieDown rigging={rigging} boomAngle={boomAngle} highlight={highlight} />
+      {/* No halyard — Laser uses a sleeve sail that slides over the mast */}
     </group>
   );
 }

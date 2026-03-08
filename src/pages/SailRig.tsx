@@ -222,7 +222,7 @@ const SailRig = () => {
             </div>
             <div>
               <h1 className="text-sm font-bold font-mono">Sail Rig Integration</h1>
-              <p className="text-[10px] text-muted-foreground">Mast • Boom • Sail • Ropes • Pulleys • Traveler</p>
+              <p className="text-[10px] text-muted-foreground">Mast • Boom • Sail • Ropes • Rope Horse • No Halyard (Sleeve Sail)</p>
             </div>
           </div>
         </div>
@@ -418,7 +418,7 @@ const SailRig = () => {
           {/* === TRAVELER === */}
           <Collapsible open={sections.traveler}>
             <CollapsibleTrigger onClick={() => toggle("traveler")} className="flex items-center justify-between w-full py-1.5 text-xs font-semibold">
-              <span>🔩 Traveler</span>
+              <span>🪢 Rope Horse (Traveler)</span>
               <ChevronDown className={`w-3 h-3 transition-transform ${sections.traveler ? "rotate-180" : ""}`} />
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-3 pt-2">
