@@ -290,7 +290,8 @@ export const DEFAULT_LASER_RIGGING: LaserRiggingParams = {
       count: 4,
       positions: [0.25, 0.45, 0.65, 0.85],
       lengths: [0.9, 0.75, 0.55, 0.35],
-      stiffness: 0.8
+      stiffness: 0.8,
+      stiffnesses: [0.8, 0.8, 0.7, 0.6],
     },
     window: {
       enabled: true,
