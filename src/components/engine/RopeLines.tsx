@@ -300,7 +300,8 @@ export function RopeLines({
       <VangRope rigging={rigging} boomAngle={boomAngle} highlight={highlight} />
       <CunninghamRope rigging={rigging} boomAngle={boomAngle} highlight={highlight} />
       <OuthaulRope rigging={rigging} boomAngle={boomAngle} highlight={highlight} />
-      <HalyardRope rigging={rigging} highlight={highlight} />
+      <ClewTieDown rigging={rigging} boomAngle={boomAngle} highlight={highlight} />
+      {/* No halyard — Laser uses a sleeve sail that slides over the mast */}
     </group>
   );
 }
