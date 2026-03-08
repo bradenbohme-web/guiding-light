@@ -11,7 +11,7 @@ import { BoatSpray } from "./BoatSpray";
 import { HullV2Params } from "@/lib/parametric/v2/types";
 import { LaserRiggingParams } from "@/lib/parametric/laserRigging";
 
-export type HullVersion = "parametric" | "brep" | "legacy";
+export type HullVersion = "parametric" | "v3" | "brep" | "legacy";
 
 interface BoatGroupV2Props {
   params: HullV2Params;
