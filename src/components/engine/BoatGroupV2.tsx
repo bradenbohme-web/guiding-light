@@ -3,6 +3,7 @@ import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { LaserHullUltimateModel } from "./LaserHullParametricUltimate";
+import { LaserHullUltimateModel as LaserHullV3Model } from "./LaserHullParametricUltimateV3";
 import { LaserHullBRepModel } from "./LaserHullBRep";
 import { HullMeshV2 } from "./HullMeshV2";
 import { RiggingMesh } from "./RiggingMesh";
