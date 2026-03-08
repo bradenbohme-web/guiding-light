@@ -1,6 +1,7 @@
 import * as React from "react";
 import * as THREE from "three";
-import { MeshProps } from "@react-three/fiber";
+import { GroupProps } from "@react-three/fiber";
+import { Line } from "@react-three/drei";
 
 type ScalarPoint = [number, number];
 
