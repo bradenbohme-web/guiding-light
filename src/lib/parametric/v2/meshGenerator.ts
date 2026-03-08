@@ -284,11 +284,13 @@ export function generateLipElbowV2(
   const sternHalfBeam = evalBeamV2(0, params);
   const sternY = evalDeckV2(0, params);
   const sternX = -length / 2;
-  const lipInset = overhang * 0.7;
+  const sternBaseInset = overhang * 0.7;
+  const sternAdaptiveInset = Math.min(sternBaseInset, sternHalfBeam * 0.8);
+  const sternRailHalfBeam = Math.max(sternHalfBeam - sternAdaptiveInset, sternHalfBeam * 0.2);
   
   for (let i = 1; i < transomSamples; i++) {
     const t = i / transomSamples;
-    const z = lerp(sternHalfBeam - lipInset, -(sternHalfBeam - lipInset), t);
+    const z = lerp(sternRailHalfBeam, -sternRailHalfBeam, t);
     
     perimeterPoints.push({
       x: sternX,
