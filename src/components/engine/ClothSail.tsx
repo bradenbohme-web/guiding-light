@@ -246,7 +246,7 @@ export function ClothSail({
         if (!battenPts || battenPts.length < 3) return;
 
         // Stiffness in 0..1 range from rigging, map to strong constraint
-        const k = 0.6 + (rigging.sail.battens.stiffness ?? 0.8) * 0.35;
+        const k = 0.45 + (rigging.sail.battens.stiffness ?? 0.8) * 0.3;
 
         for (let ii = 0; ii < battenPts.length - 1; ii++) {
           const p1 = battenPts[ii];
