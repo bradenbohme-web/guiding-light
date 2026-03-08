@@ -115,29 +115,36 @@ function getControlPointsForView(
   const points: ControlPoint[] = [];
   
   if (viewType === "top") {
-    // Beam control points along length
-    const beamPositions = [0, 0.25, params.beam.maxBeamPos, params.bow.taperStart, 0.85, 1];
-    beamPositions.forEach((u, i) => {
-      const x = (u - 0.5) * length;
-      const z = evalBeamV2(u, params);
-      
-      let paramKey = '';
-      let label = '';
-      if (u === 0) { paramKey = 'beam.sternWidth'; label = 'Stern'; }
-      else if (u === params.beam.maxBeamPos) { paramKey = 'beam.maxBeamPos'; label = 'Max Beam'; }
-      else if (u === params.bow.taperStart) { paramKey = 'bow.taperStart'; label = 'Taper Start'; }
-      else if (u === 1) { paramKey = 'bow.knifeWidth'; label = 'Bow Edge'; }
-      else return;
-      
+    const bowEntryU = Math.min(0.98, Math.max(params.bow.taperStart + 0.03, 1 - params.bow.entryLength));
+
+    const topControls: Array<{
+      id: string;
+      u: number;
+      paramKey: string;
+      label: string;
+      direction: 'x' | 'y';
+      scale: number;
+    }> = [
+      { id: 'beam-stern', u: 0, paramKey: 'beam.sternWidth', label: 'Stern', direction: 'y', scale: 0.01 },
+      { id: 'beam-max', u: params.beam.maxBeamPos, paramKey: 'beam.maxBeamPos', label: 'Max Beam', direction: 'x', scale: 0.01 / length },
+      { id: 'bow-taper-start', u: params.bow.taperStart, paramKey: 'bow.taperStart', label: 'Taper Start', direction: 'x', scale: 0.01 / length },
+      { id: 'bow-entry', u: bowEntryU, paramKey: 'bow.entryLength', label: 'Entry Length', direction: 'x', scale: -0.01 / length },
+      { id: 'bow-edge', u: 1, paramKey: 'bow.knifeWidth', label: 'Stem Width', direction: 'y', scale: 0.01 },
+    ];
+
+    topControls.forEach((ctrl) => {
+      const x = (ctrl.u - 0.5) * length;
+      const z = evalBeamV2(ctrl.u, params);
+
       points.push({
-        id: `beam-${i}`,
+        id: ctrl.id,
         x,
         y: z,
-        paramKey,
-        label,
+        paramKey: ctrl.paramKey,
+        label: ctrl.label,
         color: '#0ea5e9',
-        direction: u === params.beam.maxBeamPos || u === params.bow.taperStart ? 'x' : 'y',
-        scale: u === params.beam.maxBeamPos || u === params.bow.taperStart ? 0.01 / length : 0.01,
+        direction: ctrl.direction,
+        scale: ctrl.scale,
       });
     });
   }
