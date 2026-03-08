@@ -184,13 +184,15 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
   },
   bow: {
     edgeRake: 15,
-    taperStart: 0.78,      // Keep shoulders broad longer; taper in final approach
-    taperPower: 2.1,       // Fuller carry, faster final convergence
-    knifeWidth: 0.02,      // Avoid excessive needle while retaining pointed entry
+    taperStart: 0.68,      // Shoulder release point
+    taperPower: 1.6,       // Shoulder fullness
+    entryLength: 0.16,     // Last ~16% of hull is dedicated nose run-in
+    noseBluntness: 0.45,   // Mid-blunt default, tunable either way
+    knifeWidth: 0.012,     // Physical stem width control
   },
   beam: {
     sternWidth: 0.84,
-    maxBeamPos: 0.52,      // Shorter bow-run taper, closer to Laser top-profile feel
+    maxBeamPos: 0.50,
     sternBlend: 0.15,
     interpolation: 'balloon',
   },
