@@ -75,23 +75,19 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
   } else {
     const t = clamp((u - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos), 0, 1);
 
-    // taperStart places the center of taper acceleration in bow region
+    // Fair bow taper with no shoulder and no early neck plateau.
+    // taperStart shifts taper timing without creating a flat segment.
     const taperNorm = clamp((taperStart - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos), 0.05, 0.95);
-
-    // taperPower acts as fullness control:
-    // low = lean/quick pinch, high = fuller/longer carry
     const fullness = clamp((taperPower - 0.3) / (3 - 0.3), 0, 1);
-    const center = clamp(taperNorm + (fullness - 0.5) * 0.2, 0.05, 0.95);
-    const k = lerp(14, 4, fullness); // logistic steepness
 
-    // Use smootherstep(t) so slope is zero at max beam join (fair curvature)
-    const tSmooth = smootherstep(t);
+    // Timing warp around the mid-region; preserves endpoints and continuity.
+    // Lower taperStart => earlier taper, higher taperStart => later/fuller carry.
+    const timingShift = (0.5 - taperNorm) * 1.1;
+    const warpedT = clamp(t + timingShift * t * (1 - t), 0, 1);
 
-    // Normalized logistic for smooth C∞ taper without shoulder kinks
-    const L = 1 / (1 + Math.exp(-k * (tSmooth - center)));
-    const L0 = 1 / (1 + Math.exp(-k * (0 - center)));
-    const L1 = 1 / (1 + Math.exp(-k * (1 - center)));
-    const shaped = clamp((L - L0) / Math.max(1e-6, L1 - L0), 0, 1);
+    // Fullness controls how long width is carried before final convergence.
+    const curvePow = lerp(0.9, 2.2, fullness);
+    const shaped = Math.pow(smootherstep(warpedT), curvePow);
 
     factor = lerp(1.0, knifeRatio, shaped);
   }

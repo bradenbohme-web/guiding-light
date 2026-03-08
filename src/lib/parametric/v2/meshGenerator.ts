@@ -152,7 +152,8 @@ export function generateDeckSheetV2(
     const deckCrown = evalDeckCrownV2(u, params);
     
     // Deck inset from rail to match lip attachment
-    const lipInset = params.lip.overhang * 0.7;
+    // IMPORTANT: inset must shrink near bow so it never exceeds halfBeam
+    const baseLipInset = params.lip.overhang * 0.7;
     
     // Stern rise: deck edges curve upward near stern
     const { sternRise, sternRiseStart } = params.deck;
@@ -162,10 +163,13 @@ export function generateDeckSheetV2(
       sternRiseAmount = sternRise * t * t; // Quadratic rise toward stern
     }
     
+    const adaptiveInset = Math.min(baseLipInset, halfBeam * 0.85);
+    const deckHalfBeam = Math.max(halfBeam - adaptiveInset, halfBeam * 0.15);
+
     for (let j = 0; j <= Nv; j++) {
       const s = j / Nv;
       const zNorm = s * 2 - 1; // -1 to 1
-      const z = zNorm * (halfBeam - lipInset);
+      const z = zNorm * deckHalfBeam;
       
       // Apply crown across beam
       const normalizedZ = Math.abs(zNorm);
@@ -243,12 +247,14 @@ export function generateLipElbowV2(
     const x = (u - 0.5) * length;
     const halfBeam = evalBeamV2(u, params);
     const yDeck = evalDeckV2(u, params);
-    const lipInset = overhang * 0.7;
+    const baseLipInset = overhang * 0.7;
+    const adaptiveInset = Math.min(baseLipInset, halfBeam * 0.8);
+    const railHalfBeam = Math.max(halfBeam - adaptiveInset, halfBeam * 0.2);
     
     perimeterPoints.push({
       x,
       y: yDeck,
-      z: -(halfBeam - lipInset),
+      z: -railHalfBeam,
       nx: 0,
       nz: -1,
     });
@@ -260,12 +266,14 @@ export function generateLipElbowV2(
     const x = (u - 0.5) * length;
     const halfBeam = evalBeamV2(u, params);
     const yDeck = evalDeckV2(u, params);
-    const lipInset = overhang * 0.7;
+    const baseLipInset = overhang * 0.7;
+    const adaptiveInset = Math.min(baseLipInset, halfBeam * 0.8);
+    const railHalfBeam = Math.max(halfBeam - adaptiveInset, halfBeam * 0.2);
     
     perimeterPoints.push({
       x,
       y: yDeck,
-      z: (halfBeam - lipInset),
+      z: railHalfBeam,
       nx: 0,
       nz: 1,
     });
@@ -276,11 +284,13 @@ export function generateLipElbowV2(
   const sternHalfBeam = evalBeamV2(0, params);
   const sternY = evalDeckV2(0, params);
   const sternX = -length / 2;
-  const lipInset = overhang * 0.7;
+  const sternBaseInset = overhang * 0.7;
+  const sternAdaptiveInset = Math.min(sternBaseInset, sternHalfBeam * 0.8);
+  const sternRailHalfBeam = Math.max(sternHalfBeam - sternAdaptiveInset, sternHalfBeam * 0.2);
   
   for (let i = 1; i < transomSamples; i++) {
     const t = i / transomSamples;
-    const z = lerp(sternHalfBeam - lipInset, -(sternHalfBeam - lipInset), t);
+    const z = lerp(sternRailHalfBeam, -sternRailHalfBeam, t);
     
     perimeterPoints.push({
       x: sternX,
