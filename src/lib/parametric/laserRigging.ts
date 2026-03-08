@@ -261,7 +261,7 @@ export const DEFAULT_LASER_ROPES: RopeParams[] = [
 // ===== DEFAULT LASER RIGGING PARAMS =====
 export const DEFAULT_LASER_RIGGING: LaserRiggingParams = {
   mast: {
-    height: 6.8,
+    height: 6.1,             // Real Laser/ILCA 7: ~6.1m above deck (two-piece, lower 3.03m + upper 3.07m)
     baseRadius: 0.025,
     tipRadius: 0.012,
     taper: 0.5,
@@ -270,20 +270,20 @@ export const DEFAULT_LASER_RIGGING: LaserRiggingParams = {
     color: "#c0c0c0"
   },
   boom: {
-    length: 2.55,
+    length: 2.74,             // Real Laser boom: 2.74m
     radius: 0.018,
-    gooseneckHeight: 0.9,
+    gooseneckHeight: 0.84,    // Real gooseneck height: ~0.84m above deck
     vanAttach: 0.2,
     outhaul: 0.5,
-    position: new THREE.Vector3(0.0, 0.9, 0.0),
+    position: new THREE.Vector3(0.0, 0.84, 0.0),
     color: "#c0c0c0"
   },
   sail: {
-    luffLength: 5.5,
-    footLength: 2.4,
-    headWidth: 0.15,
+    luffLength: 5.13,         // Real Laser sail luff: 5.13m (sleeve fits over mast)
+    footLength: 2.74,         // Real Laser sail foot: 2.74m (matches boom length)
+    headWidth: 0.10,          // Narrow head per class rules
     footWidth: 1.0,
-    leechCurve: 0.05,
+    leechCurve: 0.04,         // Modest roach per class rules
     cunningham: 0.3,
     battens: {
       enabled: true,
