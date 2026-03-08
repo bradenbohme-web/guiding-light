@@ -66,6 +66,19 @@ export function ClothSail({
     // Batten positions (v = vertical position on sail, u=1 is leech)
     const battenPositions = rigging.sail.battens.positions;
     const battenLengths = rigging.sail.battens.lengths;
+
+    // Snap each batten to exactly one cloth row to prevent cross-row zigzag constraints
+    const battenRows = rigging.sail.battens.enabled
+      ? battenPositions.map((battenV, bi) => {
+          const row = THREE.MathUtils.clamp(Math.round(battenV * segH), 0, segH);
+          const rowV = row / segH;
+          const widthAtRow = footLength * (1 - rowV * 0.95);
+          const battenLen = Math.max(0, battenLengths[bi] || 0.5);
+          const battenUStart = Math.max(0, 1 - battenLen / Math.max(widthAtRow, 1e-6));
+
+          return { row, battenUStart };
+        })
+      : [];
     
     // Window UV position
     const windowU = rigging.sail.window.position.u;
