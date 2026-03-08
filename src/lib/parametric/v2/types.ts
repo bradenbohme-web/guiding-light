@@ -250,7 +250,7 @@ export const HULL_PARTS: Record<string, PartInfo> = {
     description: 'Where the V-hull sides converge to a knife edge. Not a separate piece - emerges from hull shape.',
     location: 'Forward extremity where hull sides meet',
     category: 'bow',
-    paramKeys: ['bow.edgeRake', 'bow.taperStart', 'bow.taperPower', 'bow.knifeWidth'],
+    paramKeys: ['bow.edgeRake', 'bow.taperStart', 'bow.taperPower', 'bow.entryLength', 'bow.noseBluntness', 'bow.knifeWidth'],
   },
   beam_curve: {
     id: 'beam_curve',
