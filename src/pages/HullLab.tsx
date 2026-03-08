@@ -19,11 +19,11 @@ const cloneDefaults = (): HullV2Params =>
   JSON.parse(JSON.stringify(DEFAULT_HULL_V2_PARAMS)) as HullV2Params;
 
 const controlConfig = [
-  { key: "beam.sternWidth", label: "Stern Width", min: 0.45, max: 0.95, step: 0.01 },
-  { key: "beam.maxBeamPos", label: "Max Beam Position", min: 0.35, max: 0.65, step: 0.01 },
-  { key: "bow.taperPower", label: "Bow Taper Power", min: 0.5, max: 3.0, step: 0.05 },
-  { key: "bow.noseBluntness", label: "Nose Bluntness", min: 0, max: 1, step: 0.01 },
-  { key: "bow.knifeWidth", label: "Knife Width", min: 0.02, max: 0.1, step: 0.001 },
+  { scope: "beam", prop: "sternWidth", label: "Stern Width", min: 0.45, max: 0.95, step: 0.01 },
+  { scope: "beam", prop: "maxBeamPos", label: "Max Beam Position", min: 0.35, max: 0.65, step: 0.01 },
+  { scope: "bow", prop: "taperPower", label: "Bow Taper Power", min: 0.5, max: 3.0, step: 0.05 },
+  { scope: "bow", prop: "noseBluntness", label: "Nose Bluntness", min: 0, max: 1, step: 0.01 },
+  { scope: "bow", prop: "knifeWidth", label: "Knife Width", min: 0.02, max: 0.1, step: 0.001 },
 ] as const;
 
 export default function HullLab() {
