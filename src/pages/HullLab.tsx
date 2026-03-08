@@ -133,10 +133,9 @@ export default function HullLab() {
         <aside className="space-y-4 rounded-lg border border-border bg-card p-4">
           <div className="space-y-3">
             {controlConfig.map((cfg) => {
-              const [scope, prop] = cfg.key.split(".") as ["beam" | "bow", keyof HullV2Params["beam"] & keyof HullV2Params["bow"]];
-              const value = Number(params[scope][prop as never]);
+              const value = Number((params[cfg.scope] as Record<string, number>)[cfg.prop]);
               return (
-                <label key={cfg.key} className="block space-y-1.5">
+                <label key={`${cfg.scope}.${cfg.prop}`} className="block space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-foreground">{cfg.label}</span>
                     <span className="text-muted-foreground">{value.toFixed(cfg.step < 0.01 ? 3 : 2)}</span>
@@ -147,7 +146,7 @@ export default function HullLab() {
                     max={cfg.max}
                     step={cfg.step}
                     value={value}
-                    onChange={(e) => setNestedValue(cfg.key, Number(e.target.value))}
+                    onChange={(e) => setNestedValue(cfg.scope, cfg.prop, Number(e.target.value))}
                     className="w-full accent-primary"
                   />
                 </label>
