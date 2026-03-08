@@ -184,11 +184,11 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
   },
   bow: {
     edgeRake: 15,
-    taperStart: 0.62,      // Shoulder release point
-    taperPower: 2.1,       // Shoulder fullness carry
-    entryLength: 0.11,     // Short nose run-in to avoid a long needle
-    noseBluntness: 0.72,   // Rounded Laser-style entry
-    knifeWidth: 0.016,     // Physical stem width control
+    taperStart: 0.62,      // (kept for compatibility, not used in superellipse bow)
+    taperPower: 2.0,       // Superellipse fullness: higher = blunter/squarer bow
+    entryLength: 0.11,     // (kept for compatibility)
+    noseBluntness: 0.6,    // Extra bluntness on top of superellipse
+    knifeWidth: 0.06,      // Physical stem width (6cm for Laser)
   },
   beam: {
     sternWidth: 0.84,
