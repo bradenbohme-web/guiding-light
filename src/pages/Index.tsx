@@ -307,6 +307,7 @@ const Index = () => {
               boatSpeed={boatSpeed}
               highlightTarget={highlightTarget}
               oceanSettings={oceanSettings}
+              hullVersion={hullVersion}
             />
           ) : (
             <Viewport3D
