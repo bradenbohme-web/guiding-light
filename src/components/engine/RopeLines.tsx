@@ -249,30 +249,40 @@ function OuthaulRope({
   );
 }
 
-// Halyard rope
-function HalyardRope({
+// Clew Tie-Down rope (secures clew to boom end)
+function ClewTieDown({
   rigging,
+  boomAngle,
   highlight
 }: {
   rigging: LaserRiggingParams;
+  boomAngle: number;
   highlight: boolean;
 }) {
   const geometry = useMemo(() => {
-    const mastX = rigging.mast.position.x;
-    const masthead = new THREE.Vector3(mastX, rigging.mast.height + 0.1, 0);
     const gooseneckY = rigging.boom.gooseneckHeight;
-    const sailHead = new THREE.Vector3(mastX + 0.05, gooseneckY + rigging.sail.luffLength, 0);
+    const mastX = rigging.mast.position.x;
 
-    const points = [masthead, sailHead];
+    // Clew position (sail corner at boom end)
+    const clewLocal = new THREE.Vector3(-rigging.boom.length + 0.05, 0.04, 0);
+    clewLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
+    const clew = new THREE.Vector3(mastX + clewLocal.x, gooseneckY + clewLocal.y, clewLocal.z);
+
+    // Boom end attachment
+    const boomEndLocal = new THREE.Vector3(-rigging.boom.length, 0, 0);
+    boomEndLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), boomAngle);
+    const boomEnd = new THREE.Vector3(mastX + boomEndLocal.x, gooseneckY + boomEndLocal.y, boomEndLocal.z);
+
+    const points = calculateCatenary(clew, boomEnd, 0.01, 8);
     const curve = new THREE.CatmullRomCurve3(points);
-    return new THREE.TubeGeometry(curve, 8, 0.003, 6, false);
-  }, [rigging]);
+    return new THREE.TubeGeometry(curve, 12, 0.002, 6, false);
+  }, [rigging, boomAngle]);
 
   const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
 
   return (
     <mesh geometry={geometry}>
-      <meshStandardMaterial color="#666666" roughness={0.6} metalness={0.15} emissive={emissive} emissiveIntensity={highlight ? 0.5 : 0} />
+      <meshStandardMaterial color="#888888" roughness={0.7} metalness={0.1} emissive={emissive} emissiveIntensity={highlight ? 0.5 : 0} />
     </mesh>
   );
 }
