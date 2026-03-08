@@ -55,8 +55,8 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
     knifeWidth,
     taperStart,
     taperPower,
-    entryLength,
-    noseBluntness,
+    entryLength = 0.16,
+    noseBluntness = 0.45,
   } = params.bow;
   const halfBeam = beam / 2;
 

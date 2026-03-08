@@ -115,7 +115,7 @@ function getControlPointsForView(
   const points: ControlPoint[] = [];
   
   if (viewType === "top") {
-    const bowEntryU = Math.min(0.98, Math.max(params.bow.taperStart + 0.03, 1 - params.bow.entryLength));
+    const bowEntryU = Math.min(0.98, Math.max(params.bow.taperStart + 0.03, 1 - (params.bow.entryLength ?? 0.16)));
 
     const topControls: Array<{
       id: string;
