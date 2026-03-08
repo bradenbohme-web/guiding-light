@@ -3,6 +3,7 @@ import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { LaserHullUltimateModel } from "./LaserHullParametricUltimate";
+import { LaserHullUltimateModel as LaserHullV3Model } from "./LaserHullParametricUltimateV3";
 import { LaserHullBRepModel } from "./LaserHullBRep";
 import { HullMeshV2 } from "./HullMeshV2";
 import { RiggingMesh } from "./RiggingMesh";
@@ -10,7 +11,7 @@ import { BoatSpray } from "./BoatSpray";
 import { HullV2Params } from "@/lib/parametric/v2/types";
 import { LaserRiggingParams } from "@/lib/parametric/laserRigging";
 
-export type HullVersion = "parametric" | "brep" | "legacy";
+export type HullVersion = "parametric" | "v3" | "brep" | "legacy";
 
 interface BoatGroupV2Props {
   params: HullV2Params;
@@ -78,6 +79,20 @@ export function BoatGroupV2({
       {/* Hull - switchable versions */}
       {hullVersion === "parametric" && (
         <LaserHullUltimateModel
+          params={{
+            length: params.dimensions.length,
+            beam: params.dimensions.beam,
+            stations: resStations,
+            sectionSamples: resSections,
+          }}
+          wireframe={showWireframe}
+          rotation={[-Math.PI / 2, 0, -Math.PI / 2]}
+          position={[-params.dimensions.length / 2, 0, 0]}
+        />
+      )}
+
+      {hullVersion === "v3" && (
+        <LaserHullV3Model
           params={{
             length: params.dimensions.length,
             beam: params.dimensions.beam,
