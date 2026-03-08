@@ -32,9 +32,8 @@ export function TransformGizmo({ position, onDrag, visible, onDraggingChange }: 
           Math.round(p.z * 1000) / 1000
         );
       }}
-      onDraggingChanged={(event: { value: boolean }) => {
-        onDraggingChange?.(Boolean(event.value));
-      }}
+      onMouseDown={() => onDraggingChange?.(true)}
+      onMouseUp={() => onDraggingChange?.(false)}
     >
       <mesh ref={meshRef} position={position}>
         <sphereGeometry args={[0.03, 10, 10]} />
