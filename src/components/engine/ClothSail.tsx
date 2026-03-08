@@ -534,58 +534,59 @@ export function ClothSail({
     });
   }, [rigging.sail.battens, luffLength, footLength, battenPointIndices]);
 
-  // Rigid batten strips: positioned by first/last cloth point but stay straight
+  // Battens are sewn into the sail: they follow cloth motion, but keep a mostly straight profile
   const BattenMesh = ({ batten }: { batten: (typeof battenMeshes)[number] }) => {
     const meshRef = useRef<THREE.Mesh>(null);
+    const lastGeometryRef = useRef<THREE.BufferGeometry | null>(null);
+
+    useEffect(() => {
+      return () => {
+        lastGeometryRef.current?.dispose();
+      };
+    }, []);
 
     useFrame(() => {
       if (!meshRef.current || batten.pointIndices.length < 2 || pointsRef.current.length === 0) return;
 
       const pts = pointsRef.current;
-      const indices = batten.pointIndices;
+      const indices = batten.pointIndices.filter((idx) => !!pts[idx]);
+      if (indices.length < 2) return;
 
-      const firstPt = pts[indices[0]];
-      const lastPt = pts[indices[indices.length - 1]];
-      if (!firstPt || !lastPt) return;
+      const first = pts[indices[0]].position;
+      const last = pts[indices[indices.length - 1]].position;
 
-      // Position at midpoint between first and last batten cloth point
-      const mid = firstPt.position.clone().add(lastPt.position).multiplyScalar(0.5);
-      // Offset slightly above sail surface
-      mid.z += 0.005;
-      meshRef.current.position.copy(mid);
+      // Higher stiffness => straighter batten, but still with slight flex
+      const straightness = THREE.MathUtils.clamp(
+        0.55 + (rigging.sail.battens.stiffness ?? 0.8) * 0.25,
+        0.55,
+        0.85
+      );
 
-      // Orient along the line from first to last point
-      const dir = lastPt.position.clone().sub(firstPt.position);
-      const len = dir.length();
-      dir.normalize();
+      const curvePoints = indices.map((idx, i) => {
+        const clothPos = pts[idx].position;
+        const t = indices.length > 1 ? i / (indices.length - 1) : 0;
+        const lineTarget = first.clone().lerp(last, t);
 
-      // Scale to actual span between endpoints
-      meshRef.current.scale.x = len / batten.length;
+        // Blend cloth-following + straightness (minimal batten flex)
+        return clothPos
+          .clone()
+          .lerp(lineTarget, straightness)
+          .add(new THREE.Vector3(0, 0, 0.004));
+      });
 
-      // Build orientation: X along batten direction
-      const up = new THREE.Vector3(0, 0, 1);
-      const right = new THREE.Vector3().crossVectors(dir, up).normalize();
-      if (right.lengthSq() < 0.001) right.set(0, 1, 0);
-      const adjustedUp = new THREE.Vector3().crossVectors(right, dir).normalize();
-      const rotMatrix = new THREE.Matrix4().makeBasis(dir, right, adjustedUp);
-      meshRef.current.quaternion.setFromRotationMatrix(rotMatrix);
+      const curve = new THREE.CatmullRomCurve3(curvePoints, false, "centripetal", 0.5);
+      const segments = Math.max(curvePoints.length * 2, 8);
+      const tubeGeometry = new THREE.TubeGeometry(curve, segments, 0.0045, 8, false);
 
-      // CRITICAL: Force cloth points along the batten to stay on the straight line
-      // This makes the batten act as a rigid stiffener sewn into the sail
-      for (let i = 1; i < indices.length - 1; i++) {
-        const pt = pts[indices[i]];
-        if (!pt || pt.fixed) continue;
-        const t = i / (indices.length - 1);
-        const target = firstPt.position.clone().lerp(lastPt.position, t);
-        // Blend toward straight line — high blend = rigid batten
-        const rigidity = 0.85 * (rigging.sail.battens.stiffness ?? 0.8);
-        pt.position.lerp(target, rigidity);
-      }
+      const previous = lastGeometryRef.current;
+      meshRef.current.geometry = tubeGeometry;
+      lastGeometryRef.current = tubeGeometry;
+      previous?.dispose();
     });
 
     return (
       <mesh ref={meshRef}>
-        <boxGeometry args={[batten.length, 0.004, 0.018]} />
+        <cylinderGeometry args={[0.0045, 0.0045, 0.01, 8]} />
         <meshStandardMaterial color="hsl(0, 0%, 25%)" roughness={0.5} />
       </mesh>
     );
