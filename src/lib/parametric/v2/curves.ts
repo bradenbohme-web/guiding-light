@@ -55,45 +55,43 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
   const halfBeam = beam / 2;
   const knifeRatio = knifeWidth / halfBeam;
 
-  // Single smooth teardrop curve — no flat plateau.
-  // Uses a blend of two half-curves joined at maxBeamPos:
-  //   Stern side: smooth rise from sternWidth → 1.0
-  //   Bow side:  smooth fall from 1.0 → knifeRatio
-  // Both halves use smooth power curves for C1 continuity at the join.
+  // Fair, continuous teardrop planform with no shoulder/plateau break:
+  // - Stern side: controlled smooth rise to max beam
+  // - Bow side: single smooth logistic taper to knife edge
 
   let factor: number;
 
   if (u <= maxBeamPos) {
-    // Stern to max beam: smooth rise
-    const t = u / maxBeamPos;
-    // sternBlend controls how quickly we reach full width
-    // Higher sternBlend = stays narrow longer then snaps to full width
-    const shaped = applyInterpolationStyle(smootherstep(t), interpolation);
+    const t = clamp(u / Math.max(1e-6, maxBeamPos), 0, 1);
+
+    // sternBlend controls how long the stern stays relatively narrow
+    // low blend -> faster rise, high blend -> slower rise
+    const blendNorm = clamp((sternBlend - 0.05) / 0.25, 0, 1);
+    const sternShape = lerp(0.8, 2.4, blendNorm);
+
+    const base = Math.pow(smootherstep(t), sternShape);
+    const shaped = applyInterpolationStyle(base, interpolation);
     factor = lerp(sternWidth, 1.0, shaped);
   } else {
-    // Max beam to bow: smooth continuous taper to knife edge
-    // taperStart shifts where the taper accelerates within this region
-    // taperPower controls fullness: 1=linear, <1=pinches early, >1=stays full longer
-    const t = (u - maxBeamPos) / (1 - maxBeamPos); // 0 at maxBeam, 1 at bow tip
+    const t = clamp((u - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos), 0, 1);
 
-    // Map taperStart into a shape parameter:
-    // taperStart near maxBeamPos = taper begins immediately (leaner bow)
-    // taperStart near 1.0 = stays full longer before tapering (fuller bow)
-    // We remap t so the "acceleration point" of the taper matches taperStart
-    const taperNorm = clamp((taperStart - maxBeamPos) / (1 - maxBeamPos), 0.01, 0.99);
+    // taperStart places the center of taper acceleration in bow region
+    const taperNorm = clamp((taperStart - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos), 0.05, 0.95);
 
-    // Two-phase smooth blend: slow taper then accelerating taper
-    let shaped: number;
-    if (t <= taperNorm) {
-      // Early region: gentle taper (holds width)
-      const earlyT = t / taperNorm;
-      // Slow start — only drops slightly
-      shaped = smootherstep(earlyT) * 0.15;
-    } else {
-      // Late region: accelerating taper to knife
-      const lateT = (t - taperNorm) / (1 - taperNorm);
-      shaped = 0.15 + 0.85 * Math.pow(smootherstep(lateT), 1 / Math.max(0.3, taperPower));
-    }
+    // taperPower acts as fullness control:
+    // low = lean/quick pinch, high = fuller/longer carry
+    const fullness = clamp((taperPower - 0.3) / (3 - 0.3), 0, 1);
+    const center = clamp(taperNorm + (fullness - 0.5) * 0.2, 0.05, 0.95);
+    const k = lerp(14, 4, fullness); // logistic steepness
+
+    // Use smootherstep(t) so slope is zero at max beam join (fair curvature)
+    const tSmooth = smootherstep(t);
+
+    // Normalized logistic for smooth C∞ taper without shoulder kinks
+    const L = 1 / (1 + Math.exp(-k * (tSmooth - center)));
+    const L0 = 1 / (1 + Math.exp(-k * (0 - center)));
+    const L1 = 1 / (1 + Math.exp(-k * (1 - center)));
+    const shaped = clamp((L - L0) / Math.max(1e-6, L1 - L0), 0, 1);
 
     factor = lerp(1.0, knifeRatio, shaped);
   }
