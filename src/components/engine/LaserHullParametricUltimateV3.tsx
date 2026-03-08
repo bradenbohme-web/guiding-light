@@ -939,10 +939,10 @@ export function LaserHullUltimateModel({
 
       {params.debug && geo.referenceLines && (
         <>
-          <Line points={geo.referenceLines.planUpper.attributes.position.array as Float32Array} color="#ff5050" lineWidth={1} />
-          <Line points={geo.referenceLines.planLower.attributes.position.array as Float32Array} color="#ff5050" lineWidth={1} />
-          <Line points={geo.referenceLines.sheer.attributes.position.array as Float32Array} color="#4cff88" lineWidth={1} />
-          <Line points={geo.referenceLines.keel.attributes.position.array as Float32Array} color="#44a0ff" lineWidth={1} />
+          <Line points={Array.from(geo.referenceLines.planUpper.attributes.position.array).reduce<[number,number,number][]>((acc, v, i) => { const idx = Math.floor(i/3); if (i%3===0) acc.push([v,0,0]); else acc[idx][i%3] = v; return acc; }, [])} color="#ff5050" lineWidth={1} />
+          <Line points={Array.from(geo.referenceLines.planLower.attributes.position.array).reduce<[number,number,number][]>((acc, v, i) => { const idx = Math.floor(i/3); if (i%3===0) acc.push([v,0,0]); else acc[idx][i%3] = v; return acc; }, [])} color="#ff5050" lineWidth={1} />
+          <Line points={Array.from(geo.referenceLines.sheer.attributes.position.array).reduce<[number,number,number][]>((acc, v, i) => { const idx = Math.floor(i/3); if (i%3===0) acc.push([v,0,0]); else acc[idx][i%3] = v; return acc; }, [])} color="#4cff88" lineWidth={1} />
+          <Line points={Array.from(geo.referenceLines.keel.attributes.position.array).reduce<[number,number,number][]>((acc, v, i) => { const idx = Math.floor(i/3); if (i%3===0) acc.push([v,0,0]); else acc[idx][i%3] = v; return acc; }, [])} color="#44a0ff" lineWidth={1} />
         </>
       )}
     </group>
