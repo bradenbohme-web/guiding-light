@@ -89,10 +89,10 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
     const postExp = lerp(0.75, 1.9, fullness);
     const postCurve = Math.pow(smootherstep(postT), postExp);
 
-    // 0.22 keeps the bow shoulder fuller before final run-in.
+    // 0.08 keeps the shoulder full and shifts convergence to the final run-in.
     const phase = t < taperNorm
-      ? preCurve * 0.22
-      : 0.22 + postCurve * 0.78;
+      ? preCurve * 0.08
+      : 0.08 + postCurve * 0.92;
 
     const bowCurve = smootherstep(phase);
     factor = lerp(1.0, knifeRatio, bowCurve);

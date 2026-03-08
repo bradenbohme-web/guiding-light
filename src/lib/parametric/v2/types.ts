@@ -317,9 +317,9 @@ export const PARAM_GROUPS: ParamGroupDef[] = [
     icon: 'Navigation',
     description: 'How hull sides converge to knife edge',
     params: [
-      { key: 'bow.taperStart', label: 'Taper Accel Point', min: 0.45, max: 0.9, step: 0.01, tooltip: 'Where taper accelerates (higher=fuller bow, lower=leaner)', hoverTarget: 'bow_edge' },
+      { key: 'bow.taperStart', label: 'Taper Accel Point', min: 0.55, max: 0.9, step: 0.01, tooltip: 'Where taper accelerates (higher=fuller bow, lower=leaner)', hoverTarget: 'bow_edge' },
       { key: 'bow.taperPower', label: 'Bow Fullness', min: 0.3, max: 3, step: 0.1, tooltip: 'How full the bow stays (higher=fuller, rounder)', hoverTarget: 'bow_edge' },
-      { key: 'bow.knifeWidth', label: 'Knife Width', min: 0.015, max: 0.08, step: 0.005, unit: 'm', tooltip: 'Minimum width at bow tip', hoverTarget: 'bow_edge' },
+      { key: 'bow.knifeWidth', label: 'Knife Width', min: 0.01, max: 0.08, step: 0.005, unit: 'm', tooltip: 'Minimum width at bow tip', hoverTarget: 'bow_edge' },
       { key: 'bow.edgeRake', label: 'Edge Rake', min: -30, max: 30, step: 1, unit: '°', tooltip: 'Bow edge angle in side view (bottom hull only)', hoverTarget: 'bow_edge' },
     ],
   },
