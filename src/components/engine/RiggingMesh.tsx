@@ -84,7 +84,7 @@ function BoomMesh({
 
   return (
     <group
-      position={[rigging.mast.position.x, gooseneckY, 0]}
+      position={[rigging.boom.position.x, rigging.boom.position.y, rigging.boom.position.z]}
       rotation={[0, angle, 0]}
     >
       <mesh
