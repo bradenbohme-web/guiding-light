@@ -519,6 +519,27 @@ export function ClothSail({
       winPos.needsUpdate = true;
       windowGeometryRef.current.computeVertexNormals();
     }
+
+    // Update batten tube meshes from single-row cloth points
+    if (rigging.sail.battens.enabled && battenPointIndices) {
+      battenPointIndices.forEach((rowPts, bi) => {
+        const mesh = battenMeshRefs.current[bi];
+        if (!mesh || !rowPts || rowPts.length < 2) return;
+
+        // Build a curve from the cloth points in this single row
+        const curvePoints: THREE.Vector3[] = [];
+        for (let ii = 0; ii < rowPts.length; ii++) {
+          const p = pts[rowPts[ii]];
+          curvePoints.push(p.position.clone().add(new THREE.Vector3(0, 0, 0.003)));
+        }
+
+        const curve = new THREE.CatmullRomCurve3(curvePoints, false);
+        const tubeGeo = new THREE.TubeGeometry(curve, Math.max(4, curvePoints.length * 2), 0.006, 4, false);
+
+        mesh.geometry.dispose();
+        mesh.geometry = tubeGeo;
+      });
+    }
   });
 
   const gooseneckY = rigging.boom.gooseneckHeight;
