@@ -185,9 +185,9 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
   bow: {
     edgeRake: 15,
     taperStart: 0.62,      // (kept for compatibility, not used in superellipse bow)
-    taperPower: 2.0,       // Superellipse fullness: higher = blunter/squarer bow
+    taperPower: 1.2,       // Superellipse fullness: maps to n=2.0–2.6 range
     entryLength: 0.11,     // (kept for compatibility)
-    noseBluntness: 0.6,    // Extra bluntness on top of superellipse
+    noseBluntness: 0.25,   // Linear blend factor to soften bow tip (0–1)
     knifeWidth: 0.06,      // Physical stem width (6cm for Laser)
   },
   beam: {

@@ -74,28 +74,26 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
     return halfBeam * clamp(factor, sternWidth, 1.0);
   }
 
-  // BOW: Superellipse / egg-shape approach.
+  // BOW: Laser-class superellipse with controlled exponent.
   // t goes from 0 (at max-beam) to 1 (at bow tip).
-  // Width = stemHalf + (halfBeam - stemHalf) * (1 - t^n)^(1/n)
-  // where n controls the shape: n=2 is a circle/ellipse, n>2 is blunter/squarer.
-  //
-  // taperPower controls overall fullness (maps to superellipse exponent)
-  // noseBluntness further adjusts the exponent toward blunter shapes
+  // Fixed: use lower n (2.0–2.6) to prevent shoulder/neck pinch.
+  // noseBluntness blends in a linear component to soften the tip.
 
   const bowSpan = Math.max(1e-6, 1 - maxBeamPos);
   const t = clamp((uClamped - maxBeamPos) / bowSpan, 0, 1);
 
-  // Superellipse exponent: 2.0 = ellipse, higher = blunter/more rectangular bow
-  const baseExp = lerp(1.6, 3.5, clamp(taperPower / 3, 0, 1));
-  const n = lerp(baseExp, baseExp + 1.5, clamp(noseBluntness, 0, 1));
+  // Laser hulls are slightly fuller than a circle (n=2) but not boxy.
+  // taperPower adjusts fullness within a safe range.
+  const n = lerp(2.0, 2.6, clamp(taperPower / 3, 0, 1));
 
-  // Superellipse: width fraction = (1 - t^n)^(1/n)
-  const tPow = Math.pow(t, n);
-  const ellipseFraction = Math.pow(Math.max(0, 1 - tPow), 1 / n);
+  // Standard superellipse: width fraction = (1 - t^n)^(1/n)
+  const ellipseFraction = Math.pow(Math.max(0, 1 - Math.pow(t, n)), 1 / n);
 
-  // Interpolate between stem width and full half-beam
-  const width = stemHalf + (halfBeam - stemHalf) * ellipseFraction;
+  // noseBluntness blends in a linear (1-t) component to prevent
+  // the infinite-derivative "pinch" at t→1
+  const smoothT = lerp(ellipseFraction, 1 - t, clamp(noseBluntness, 0, 1) * 0.5);
 
+  const width = stemHalf + (halfBeam - stemHalf) * smoothT;
   return Math.max(stemHalf, width);
 }
 
