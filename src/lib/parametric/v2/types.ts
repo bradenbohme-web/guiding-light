@@ -182,13 +182,13 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
   },
   bow: {
     edgeRake: 15,
-    taperStart: 0.70,      // Hold width forward, then converge in the last third
-    taperPower: 1.8,       // Fuller carry before final run-in
-    knifeWidth: 0.03,      // Prevent needle-like bow in plan view
+    taperStart: 0.78,      // Keep shoulders broad longer; taper in final approach
+    taperPower: 2.1,       // Fuller carry, faster final convergence
+    knifeWidth: 0.02,      // Avoid excessive needle while retaining pointed entry
   },
   beam: {
     sternWidth: 0.84,
-    maxBeamPos: 0.50,      // Move max beam forward for shorter Laser-style entry taper
+    maxBeamPos: 0.52,      // Shorter bow-run taper, closer to Laser top-profile feel
     sternBlend: 0.15,
     interpolation: 'balloon',
   },
