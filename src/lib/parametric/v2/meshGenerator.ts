@@ -266,12 +266,14 @@ export function generateLipElbowV2(
     const x = (u - 0.5) * length;
     const halfBeam = evalBeamV2(u, params);
     const yDeck = evalDeckV2(u, params);
-    const lipInset = overhang * 0.7;
+    const baseLipInset = overhang * 0.7;
+    const adaptiveInset = Math.min(baseLipInset, halfBeam * 0.8);
+    const railHalfBeam = Math.max(halfBeam - adaptiveInset, halfBeam * 0.2);
     
     perimeterPoints.push({
       x,
       y: yDeck,
-      z: (halfBeam - lipInset),
+      z: railHalfBeam,
       nx: 0,
       nz: 1,
     });
