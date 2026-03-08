@@ -133,7 +133,7 @@ export default function HullLab() {
         <aside className="space-y-4 rounded-lg border border-border bg-card p-4">
           <div className="space-y-3">
             {controlConfig.map((cfg) => {
-              const value = Number((params[cfg.scope] as Record<string, number>)[cfg.prop]);
+              const value = Number((params[cfg.scope] as unknown as Record<string, number>)[cfg.prop]);
               return (
                 <label key={`${cfg.scope}.${cfg.prop}`} className="block space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
