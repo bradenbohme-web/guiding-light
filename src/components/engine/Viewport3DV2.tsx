@@ -8,7 +8,7 @@ import {
   GizmoViewport,
   PerspectiveCamera,
 } from "@react-three/drei";
-import { BoatGroupV2 } from "./BoatGroupV2";
+import { BoatGroupV2, HullVersion } from "./BoatGroupV2";
 import { OceanEnvironment } from "./OceanEnvironment";
 import { HullV2Params } from "@/lib/parametric/v2/types";
 import { LaserRiggingParams } from "@/lib/parametric/laserRigging";
@@ -30,6 +30,7 @@ interface Viewport3DV2Props {
   boatSpeed: number;
   highlightTarget: string | null;
   oceanSettings?: OceanSettings;
+  hullVersion?: HullVersion;
 }
 
 // Camera positions for different views
@@ -56,6 +57,7 @@ export function Viewport3DV2({
   boatSpeed,
   highlightTarget,
   oceanSettings,
+  hullVersion = "parametric",
 }: Viewport3DV2Props) {
   const cameraPosition = CAMERA_POSITIONS[viewMode];
 
@@ -66,7 +68,6 @@ export function Viewport3DV2({
       style={{ background: showOcean ? "transparent" : "hsl(222, 47%, 11%)" }}
     >
       <Suspense fallback={null}>
-        {/* Camera */}
         <PerspectiveCamera
           makeDefault
           position={cameraPosition}
@@ -75,12 +76,10 @@ export function Viewport3DV2({
           far={1000}
         />
 
-        {/* Environment */}
         {showOcean ? (
           <OceanEnvironment enabled={true} oceanSettings={oceanSettings} />
         ) : (
           <>
-            {/* Studio lighting for non-ocean mode */}
             <ambientLight intensity={0.4} />
             <directionalLight
               position={[10, 10, 5]}
@@ -95,7 +94,6 @@ export function Viewport3DV2({
           </>
         )}
 
-        {/* Grid */}
         {showGrid && !showOcean && (
           <Grid
             args={[20, 20]}
@@ -111,7 +109,6 @@ export function Viewport3DV2({
           />
         )}
 
-        {/* V2 Boat */}
         <BoatGroupV2
           params={params}
           resolution={resolution}
@@ -125,9 +122,9 @@ export function Viewport3DV2({
           boatSpeed={boatSpeed}
           showOcean={showOcean}
           highlightTarget={highlightTarget}
+          hullVersion={hullVersion}
         />
 
-        {/* Controls - full freedom of movement */}
         <OrbitControls
           enableDamping
           dampingFactor={0.05}
@@ -140,7 +137,6 @@ export function Viewport3DV2({
           rotateSpeed={1}
         />
 
-        {/* Gizmo */}
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
           <GizmoViewport
             axisColors={["#ef4444", "#22c55e", "#3b82f6"]}

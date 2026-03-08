@@ -15,16 +15,25 @@ import { HullParams, DEFAULT_HULL_PARAMS } from "@/lib/parametric/types";
 import { HullV2Params, DEFAULT_HULL_V2_PARAMS } from "@/lib/parametric/v2/types";
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING } from "@/lib/parametric/laserRigging";
 import { OceanSettings, DEFAULT_OCEAN_SETTINGS } from "@/lib/ocean/types";
+import { HullVersion } from "@/components/engine/BoatGroupV2";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Cpu, Settings, TrendingUp, Sailboat, Grid2X2, Image, Waves } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+const HULL_VERSIONS: { id: HullVersion; label: string; description: string }[] = [
+  { id: "parametric", label: "Parametric", description: "Catmull-Rom + Bézier sections" },
+  { id: "brep", label: "B-Rep", description: "OpenSCAD-derived solid" },
+  { id: "legacy", label: "Legacy", description: "V2 mesh generator" },
+];
+
 const Index = () => {
-  // Hull version toggle
-  const [useV2Hull, setUseV2Hull] = useState(true);
+  // Hull version
+  const [hullVersion, setHullVersion] = useState<HullVersion>("parametric");
+  const useV2Hull = hullVersion !== "legacy";
   
   // V1 Hull params
   const [params, setParams] = useState<HullParams>({ ...DEFAULT_HULL_PARAMS });
@@ -115,25 +124,24 @@ const Index = () => {
           </Link>
         </div>
         
-        {/* Hull Version Toggle */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-1.5">
-            <span className={cn(
-              "text-xs font-mono transition-colors",
-              !useV2Hull ? "text-foreground" : "text-muted-foreground"
-            )}>V1</span>
-            <Switch 
-              checked={useV2Hull} 
-              onCheckedChange={setUseV2Hull}
-              className="data-[state=checked]:bg-primary"
-            />
-            <span className={cn(
-              "text-xs font-mono transition-colors",
-              useV2Hull ? "text-foreground" : "text-muted-foreground"
-            )}>V2</span>
+        {/* Hull Version Switcher */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
+            {HULL_VERSIONS.map((v) => (
+              <Button
+                key={v.id}
+                variant={hullVersion === v.id ? "default" : "ghost"}
+                size="sm"
+                className="text-xs font-mono h-7 px-2.5"
+                onClick={() => setHullVersion(v.id)}
+                title={v.description}
+              >
+                {v.label}
+              </Button>
+            ))}
           </div>
-          <Badge variant={useV2Hull ? "default" : "secondary"} className="font-mono text-xs">
-            {useV2Hull ? "Hull V2 - 5 Piece" : "Hull V1 - Legacy"}
+          <Badge variant="default" className="font-mono text-xs">
+            {HULL_VERSIONS.find((v) => v.id === hullVersion)?.description}
           </Badge>
         </div>
       </header>
@@ -299,6 +307,7 @@ const Index = () => {
               boatSpeed={boatSpeed}
               highlightTarget={highlightTarget}
               oceanSettings={oceanSettings}
+              hullVersion={hullVersion}
             />
           ) : (
             <Viewport3D
