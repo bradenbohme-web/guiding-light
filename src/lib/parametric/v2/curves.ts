@@ -43,59 +43,135 @@ function applyInterpolationStyle(t: number, style: InterpolationStyle): number {
 }
 
 // ============================================
+// LASER HALF-BREADTH OFFSET TABLE
+// ============================================
+// Derived from ILCA class measurement diagrams and known Laser geometry.
+// u = 0 is STERN, u = 1 is BOW.
+// Values are half-beam in metres for a 4.23m LOA, 1.37m max beam hull.
+// These are the ground truth — the planform MUST pass through these points.
+
+const LASER_OFFSETS: { u: number; halfBeam: number }[] = [
+  { u: 0.000, halfBeam: 0.575 },  // Transom — ~84% of max beam
+  { u: 0.025, halfBeam: 0.590 },  // Just forward of transom, slight flare
+  { u: 0.050, halfBeam: 0.610 },
+  { u: 0.100, halfBeam: 0.645 },  // Stern quarter — widening
+  { u: 0.150, halfBeam: 0.665 },
+  { u: 0.200, halfBeam: 0.678 },
+  { u: 0.250, halfBeam: 0.685 },  // Approaching max beam
+  { u: 0.300, halfBeam: 0.685 },  // Max beam zone — broad and flat
+  { u: 0.350, halfBeam: 0.685 },  // Still at max beam
+  { u: 0.400, halfBeam: 0.683 },  // Very slight narrowing begins
+  { u: 0.450, halfBeam: 0.678 },
+  { u: 0.500, halfBeam: 0.665 },  // Midship — starting to taper
+  { u: 0.550, halfBeam: 0.645 },
+  { u: 0.600, halfBeam: 0.615 },  // Forward — taper accelerating
+  { u: 0.650, halfBeam: 0.575 },
+  { u: 0.700, halfBeam: 0.520 },
+  { u: 0.750, halfBeam: 0.450 },  // Bow quarter — rapid narrowing
+  { u: 0.800, halfBeam: 0.365 },
+  { u: 0.850, halfBeam: 0.270 },
+  { u: 0.900, halfBeam: 0.175 },  // Approaching stem
+  { u: 0.925, halfBeam: 0.125 },
+  { u: 0.950, halfBeam: 0.080 },
+  { u: 0.975, halfBeam: 0.045 },
+  { u: 1.000, halfBeam: 0.030 },  // Knife edge / stem
+];
+
+// Catmull-Rom spline interpolation through offset table
+function catmullRomInterp(offsets: { u: number; halfBeam: number }[], uQuery: number): number {
+  const n = offsets.length;
+  const u = clamp(uQuery, offsets[0].u, offsets[n - 1].u);
+
+  // Find the segment
+  let idx = 0;
+  for (let i = 0; i < n - 1; i++) {
+    if (u >= offsets[i].u && u <= offsets[i + 1].u) {
+      idx = i;
+      break;
+    }
+  }
+
+  // Four control points for Catmull-Rom (clamp at boundaries)
+  const p0 = offsets[Math.max(0, idx - 1)];
+  const p1 = offsets[idx];
+  const p2 = offsets[Math.min(n - 1, idx + 1)];
+  const p3 = offsets[Math.min(n - 1, idx + 2)];
+
+  const segLen = p2.u - p1.u;
+  if (segLen < 1e-9) return p1.halfBeam;
+  const t = (u - p1.u) / segLen;
+  const t2 = t * t;
+  const t3 = t2 * t;
+
+  // Catmull-Rom basis (tension = 0.5)
+  const v = 0.5 * (
+    (2 * p1.halfBeam) +
+    (-p0.halfBeam + p2.halfBeam) * t +
+    (2 * p0.halfBeam - 5 * p1.halfBeam + 4 * p2.halfBeam - p3.halfBeam) * t2 +
+    (-p0.halfBeam + 3 * p1.halfBeam - 3 * p2.halfBeam + p3.halfBeam) * t3
+  );
+
+  return Math.max(0.005, v);
+}
+
+// ============================================
 // BEAM CURVE B(u) - Half-width distribution
 // u=0 is STERN, u=1 is BOW
-// Smooth continuous curve - no piecewise hard transitions
+// Uses Catmull-Rom through real Laser offsets, then applies
+// user adjustments as proportional deltas from baseline.
 // ============================================
 
 export function evalBeamV2(u: number, params: HullV2Params): number {
   const { beam } = params.dimensions;
   const { sternWidth, maxBeamPos, sternBlend, interpolation } = params.beam;
-  const {
-    knifeWidth,
-    taperPower,
-    noseBluntness = 0.45,
-  } = params.bow;
+  const { knifeWidth, noseBluntness } = params.bow;
 
-  const halfBeam = beam / 2;
   const uClamped = clamp(u, 0, 1);
+  const halfBeam = beam / 2;
 
-  // Minimum bow width (physical stem)
-  const stemHalf = clamp(knifeWidth / 2, 0.005, halfBeam * 0.25);
+  // Base shape: Catmull-Rom through Laser offset table
+  // Scale the table values proportionally to the current beam parameter
+  const scaleFactor = halfBeam / 0.685; // 0.685 = max half-beam in table
+  let baseValue = catmullRomInterp(LASER_OFFSETS, uClamped) * scaleFactor;
 
-  if (uClamped <= maxBeamPos) {
-    // Stern to max-beam: unchanged
-    const t = clamp(uClamped / Math.max(1e-6, maxBeamPos), 0, 1);
-    const blendNorm = clamp((sternBlend - 0.05) / 0.25, 0, 1);
-    const sternShape = lerp(0.8, 2.4, blendNorm);
-    const base = Math.pow(smootherstep(t), sternShape);
-    const shaped = applyInterpolationStyle(base, interpolation);
-    const factor = lerp(sternWidth, 1.0, shaped);
-    return halfBeam * clamp(factor, sternWidth, 1.0);
+  // Apply user adjustments as DELTAS from baseline, not replacements:
+
+  // 1. maxBeamPos shift: laterally shifts the widest point
+  //    Default is ~0.30 in the table. User param shifts the peak.
+  const defaultMaxPos = 0.325; // center of the flat max-beam zone in table
+  const posShift = maxBeamPos - defaultMaxPos;
+  if (Math.abs(posShift) > 0.01) {
+    // Re-query the table with shifted u to move the peak
+    const shiftedU = clamp(uClamped - posShift * 0.8, 0, 1);
+    baseValue = catmullRomInterp(LASER_OFFSETS, shiftedU) * scaleFactor;
   }
 
-  // BOW: Laser-class superellipse with controlled exponent.
-  // t goes from 0 (at max-beam) to 1 (at bow tip).
-  // Fixed: use lower n (2.0–2.6) to prevent shoulder/neck pinch.
-  // noseBluntness blends in a linear component to soften the tip.
+  // 2. sternWidth: scale the stern region proportionally
+  const defaultSternRatio = 0.575 / 0.685; // ~0.839
+  if (uClamped < 0.15) {
+    const sternT = uClamped / 0.15;
+    const sternAdjust = sternWidth / defaultSternRatio;
+    const blend = 1 - smootherstep(sternT);
+    baseValue *= lerp(sternAdjust, 1.0, blend);
+  }
 
-  const bowSpan = Math.max(1e-6, 1 - maxBeamPos);
-  const t = clamp((uClamped - maxBeamPos) / bowSpan, 0, 1);
+  // 3. Knife width at bow tip
+  const stemHalf = clamp(knifeWidth / 2, 0.005, halfBeam * 0.15);
+  if (uClamped > 0.9) {
+    const bowT = (uClamped - 0.9) / 0.1;
+    baseValue = lerp(baseValue, stemHalf, smootherstep(bowT));
+  }
 
-  // Laser hulls are slightly fuller than a circle (n=2) but not boxy.
-  // taperPower adjusts fullness within a safe range.
-  const n = lerp(2.0, 2.6, clamp(taperPower / 3, 0, 1));
+  // 4. noseBluntness softens the final convergence
+  if (uClamped > 0.85 && noseBluntness > 0) {
+    const bluntT = (uClamped - 0.85) / 0.15;
+    const bluntInflate = noseBluntness * 0.03 * scaleFactor * (1 - bluntT);
+    baseValue += bluntInflate * smootherstep(bluntT);
+  }
 
-  // Standard superellipse: width fraction = (1 - t^n)^(1/n)
-  const ellipseFraction = Math.pow(Math.max(0, 1 - Math.pow(t, n)), 1 / n);
-
-  // noseBluntness blends in a linear (1-t) component to prevent
-  // the infinite-derivative "pinch" at t→1
-  const smoothT = lerp(ellipseFraction, 1 - t, clamp(noseBluntness, 0, 1) * 0.5);
-
-  const width = stemHalf + (halfBeam - stemHalf) * smoothT;
-  return Math.max(stemHalf, width);
+  return clamp(baseValue, stemHalf, halfBeam);
 }
+
 
 // ============================================
 // KEEL CURVE K(u) - Bottom profile with rocker
