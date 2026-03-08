@@ -184,11 +184,11 @@ export const DEFAULT_HULL_V2_PARAMS: HullV2Params = {
   },
   bow: {
     edgeRake: 15,
-    taperStart: 0.68,      // Shoulder release point
-    taperPower: 1.6,       // Shoulder fullness
-    entryLength: 0.16,     // Last ~16% of hull is dedicated nose run-in
-    noseBluntness: 0.45,   // Mid-blunt default, tunable either way
-    knifeWidth: 0.012,     // Physical stem width control
+    taperStart: 0.62,      // Shoulder release point
+    taperPower: 2.1,       // Shoulder fullness carry
+    entryLength: 0.11,     // Short nose run-in to avoid a long needle
+    noseBluntness: 0.72,   // Rounded Laser-style entry
+    knifeWidth: 0.016,     // Physical stem width control
   },
   beam: {
     sternWidth: 0.84,
@@ -321,11 +321,11 @@ export const PARAM_GROUPS: ParamGroupDef[] = [
     icon: 'Navigation',
     description: 'How hull sides converge to knife edge',
     params: [
-      { key: 'bow.taperStart', label: 'Taper Start', min: 0.45, max: 0.9, step: 0.01, tooltip: 'Where shoulder taper starts (higher=fuller bow shoulder)', hoverTarget: 'bow_edge' },
-      { key: 'bow.taperPower', label: 'Shoulder Fullness', min: 0.3, max: 3, step: 0.1, tooltip: 'How much width is carried through the bow shoulder', hoverTarget: 'bow_edge' },
-      { key: 'bow.entryLength', label: 'Entry Length', min: 0.06, max: 0.3, step: 0.01, tooltip: 'Length of final nose run-in (higher=longer point, lower=shorter entry)', hoverTarget: 'bow_edge' },
-      { key: 'bow.noseBluntness', label: 'Nose Bluntness', min: 0, max: 1, step: 0.01, tooltip: '0=sharp nose, 1=blunt rounded entry', hoverTarget: 'bow_edge' },
-      { key: 'bow.knifeWidth', label: 'Stem Width', min: 0.005, max: 0.08, step: 0.005, unit: 'm', tooltip: 'Physical width at bow tip', hoverTarget: 'bow_edge' },
+      { key: 'bow.taperStart', label: 'Taper Start', min: 0.45, max: 0.82, step: 0.01, tooltip: 'Where bow shoulders release into taper (higher = fuller shoulders)', hoverTarget: 'bow_edge' },
+      { key: 'bow.taperPower', label: 'Shoulder Fullness', min: 0.5, max: 3, step: 0.1, tooltip: 'How strongly width is carried through the shoulder region', hoverTarget: 'bow_edge' },
+      { key: 'bow.entryLength', label: 'Entry Length', min: 0.04, max: 0.2, step: 0.01, tooltip: 'Length of final nose run-in (shorter = stubbier Laser-like bow)', hoverTarget: 'bow_edge' },
+      { key: 'bow.noseBluntness', label: 'Nose Bluntness', min: 0, max: 1, step: 0.01, tooltip: '0=sharper entry, 1=rounder/blunter entry', hoverTarget: 'bow_edge' },
+      { key: 'bow.knifeWidth', label: 'Stem Width', min: 0.01, max: 0.08, step: 0.005, unit: 'm', tooltip: 'Physical width at bow tip', hoverTarget: 'bow_edge' },
       { key: 'bow.edgeRake', label: 'Edge Rake', min: -30, max: 30, step: 1, unit: '°', tooltip: 'Bow edge angle in side view (bottom hull only)', hoverTarget: 'bow_edge' },
     ],
   },

@@ -58,14 +58,17 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
     entryLength = 0.16,
     noseBluntness = 0.45,
   } = params.bow;
-  const halfBeam = beam / 2;
 
-  const baseKnifeRatio = clamp(knifeWidth / halfBeam, 0.005, 0.25);
+  const halfBeam = beam / 2;
+  const uClamped = clamp(u, 0, 1);
+
+  // Keep a physical stem floor so top-view cannot collapse into a needle.
+  const baseKnifeRatio = clamp(knifeWidth / Math.max(1e-6, halfBeam), 0.014, 0.22);
 
   let factor: number;
 
-  if (u <= maxBeamPos) {
-    const t = clamp(u / Math.max(1e-6, maxBeamPos), 0, 1);
+  if (uClamped <= maxBeamPos) {
+    const t = clamp(uClamped / Math.max(1e-6, maxBeamPos), 0, 1);
 
     const blendNorm = clamp((sternBlend - 0.05) / 0.25, 0, 1);
     const sternShape = lerp(0.8, 2.4, blendNorm);
@@ -74,52 +77,61 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
     const shaped = applyInterpolationStyle(base, interpolation);
     factor = lerp(sternWidth, 1.0, shaped);
   } else {
-    const t = clamp((u - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos), 0, 1);
+    // Rebuilt top-view bow law: shoulder hold -> transition -> short entry collapse.
+    const bowSpan = Math.max(1e-6, 1 - maxBeamPos);
+    const t = clamp((uClamped - maxBeamPos) / bowSpan, 0, 1);
 
-    const taperNorm = clamp(
-      (taperStart - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos),
-      0.05,
-      0.88
+    const shoulderU = clamp(
+      Math.max(taperStart, maxBeamPos + 0.05),
+      maxBeamPos + 0.05,
+      0.9
+    );
+    const entryStartU = clamp(
+      1 - entryLength,
+      shoulderU + 0.04,
+      0.97
     );
 
-    const entryStartU = clamp(1 - entryLength, maxBeamPos + 0.06, 0.98);
-    const rawEntryNorm = (entryStartU - maxBeamPos) / Math.max(1e-6, 1 - maxBeamPos);
-    const entryNorm = clamp(rawEntryNorm, taperNorm + 0.05, 0.98);
+    const shoulderNorm = clamp((shoulderU - maxBeamPos) / bowSpan, 0.05, 0.88);
+    const entryNorm = clamp((entryStartU - maxBeamPos) / bowSpan, shoulderNorm + 0.06, 0.98);
 
     const fullness = clamp((taperPower - 0.3) / (3 - 0.3), 0, 1);
     const bluntness = clamp(noseBluntness, 0, 1);
 
-    const shoulderDepth = lerp(0.14, 0.06, fullness);
-    const midTarget = lerp(0.62, 0.44, fullness);
+    // Laser-like shoulder carry: hold width forward, then collapse late.
+    const shoulderDrop = lerp(0.16, 0.05, fullness);
+    const shoulderTarget = 1 - shoulderDrop;
 
-    let phase: number;
+    const midDrop = lerp(0.36, 0.2, fullness);
+    const midTarget = clamp(shoulderTarget - midDrop, 0.24, shoulderTarget - 0.02);
 
-    if (t <= taperNorm) {
-      const ns = clamp(t / Math.max(1e-6, taperNorm), 0, 1);
-      phase = smootherstep(ns) * shoulderDepth;
-    } else if (t <= entryNorm) {
-      const ns = clamp((t - taperNorm) / Math.max(1e-6, entryNorm - taperNorm), 0, 1);
-      const midExp = lerp(0.9, 1.7, fullness);
-      const midCurve = Math.pow(smootherstep(ns), midExp);
-      phase = lerp(shoulderDepth, midTarget, midCurve);
-    } else {
-      const ns = clamp((t - entryNorm) / Math.max(1e-6, 1 - entryNorm), 0, 1);
-      const noseExp = lerp(1.6, 0.8, bluntness);
-      const noseCurve = Math.pow(smootherstep(ns), noseExp);
-      phase = lerp(midTarget, 1.0, noseCurve);
-    }
-
+    const minTipRatio = Math.max(baseKnifeRatio, 0.014);
     const tipRatio = lerp(
-      baseKnifeRatio,
-      clamp(baseKnifeRatio + 0.12, baseKnifeRatio, 0.32),
+      minTipRatio,
+      clamp(minTipRatio + 0.12, minTipRatio, 0.34),
       bluntness
     );
 
-    const bowCurve = smootherstep(phase);
-    factor = lerp(1.0, tipRatio, bowCurve);
+    if (t <= shoulderNorm) {
+      const ns = clamp(t / Math.max(1e-6, shoulderNorm), 0, 1);
+      const shoulderExp = lerp(0.9, 2.1, fullness);
+      const shoulderCurve = Math.pow(smootherstep(ns), shoulderExp);
+      factor = lerp(1.0, shoulderTarget, shoulderCurve);
+    } else if (t <= entryNorm) {
+      const ns = clamp((t - shoulderNorm) / Math.max(1e-6, entryNorm - shoulderNorm), 0, 1);
+      const midExp = lerp(1.2, 2.8, fullness);
+      const midCurve = Math.pow(smootherstep(ns), midExp);
+      factor = lerp(shoulderTarget, midTarget, midCurve);
+    } else {
+      const ns = clamp((t - entryNorm) / Math.max(1e-6, 1 - entryNorm), 0, 1);
+      const noseHoldExp = lerp(0.95, 2.4, bluntness);
+      const noseCurve = Math.pow(smootherstep(ns), noseHoldExp);
+      factor = lerp(midTarget, tipRatio, noseCurve);
+    }
   }
 
-  return halfBeam * Math.max(baseKnifeRatio, factor);
+  const minFactor = Math.max(baseKnifeRatio, 0.014);
+  return halfBeam * clamp(factor, minFactor, 1.05);
 }
 
 // ============================================
