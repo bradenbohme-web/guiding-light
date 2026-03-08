@@ -106,10 +106,14 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Workshop Link */}
-        <Link to="/workshop" className="text-xs font-mono text-primary hover:underline px-3 py-1.5 bg-primary/10 rounded-lg border border-primary/20">
-          🔧 Workshop
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/workshop" className="text-xs font-mono text-primary hover:underline px-3 py-1.5 bg-primary/10 rounded-lg border border-primary/20">
+            🔧 Workshop
+          </Link>
+          <Link to="/hull-lab" className="text-xs font-mono text-primary hover:underline px-3 py-1.5 bg-primary/10 rounded-lg border border-primary/20">
+            🧪 Hull Lab
+          </Link>
+        </div>
         
         {/* Hull Version Toggle */}
         <div className="flex items-center gap-3">
