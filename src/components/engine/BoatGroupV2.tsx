@@ -105,6 +105,7 @@ export function BoatGroupV2({
         />
       )}
 
+      {hullVersion === "brep" && (
         <LaserHullBRepModel
           params={{
             nx: resStations,
