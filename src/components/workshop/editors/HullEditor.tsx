@@ -3,6 +3,7 @@ import { HullV2Params } from "@/lib/parametric/v2/types";
 import { HullMeshV2 } from "@/components/engine/HullMeshV2";
 import { HullV2SettingsPanel } from "@/components/engine/HullV2SettingsPanel";
 import { SubsystemViewport } from "../SubsystemViewport";
+import { HullShapeAssistant } from "./HullShapeAssistant";
 
 interface HullEditorProps {
   params: HullV2Params;
@@ -16,10 +17,13 @@ export function HullEditor({ params, onChange, showWireframe, resolution }: Hull
     <div className="flex h-full">
       {/* Controls */}
       <div className="w-80 border-r border-border overflow-y-auto scrollbar-hide bg-card">
-        <HullV2SettingsPanel 
-          params={params} 
-          onChange={onChange} 
-          onHoverPart={() => {}} 
+        <div className="p-3 border-b border-border">
+          <HullShapeAssistant params={params} />
+        </div>
+        <HullV2SettingsPanel
+          params={params}
+          onChange={onChange}
+          onHoverPart={() => {}}
         />
       </div>
       {/* Viewport */}
@@ -36,3 +40,4 @@ export function HullEditor({ params, onChange, showWireframe, resolution }: Hull
     </div>
   );
 }
+
