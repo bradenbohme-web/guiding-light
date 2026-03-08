@@ -53,65 +53,50 @@ export function evalBeamV2(u: number, params: HullV2Params): number {
   const { sternWidth, maxBeamPos, sternBlend, interpolation } = params.beam;
   const {
     knifeWidth,
-    taperStart,
     taperPower,
-    entryLength = 0.16,
     noseBluntness = 0.45,
   } = params.bow;
 
   const halfBeam = beam / 2;
   const uClamped = clamp(u, 0, 1);
 
-  // Keep a physical stem floor so top-view cannot collapse into a needle.
-  const baseKnifeRatio = clamp(knifeWidth / Math.max(1e-6, halfBeam), 0.014, 0.22);
-
-  let factor: number;
+  // Minimum bow width (physical stem)
+  const stemHalf = clamp(knifeWidth / 2, 0.005, halfBeam * 0.25);
 
   if (uClamped <= maxBeamPos) {
+    // Stern to max-beam: unchanged
     const t = clamp(uClamped / Math.max(1e-6, maxBeamPos), 0, 1);
-
     const blendNorm = clamp((sternBlend - 0.05) / 0.25, 0, 1);
     const sternShape = lerp(0.8, 2.4, blendNorm);
-
     const base = Math.pow(smootherstep(t), sternShape);
     const shaped = applyInterpolationStyle(base, interpolation);
-    factor = lerp(sternWidth, 1.0, shaped);
-  } else {
-    // Single fair bow law (no staged shoulders / no neck):
-    // one monotonic C2 collapse from max-beam station to stem.
-    const bowSpan = Math.max(1e-6, 1 - maxBeamPos);
-    const t = clamp((uClamped - maxBeamPos) / bowSpan, 0, 1);
-
-    // Taper timing control: higher taperStart carries width farther forward,
-    // but remains smooth (no piecewise phase boundaries).
-    const startNorm = clamp((taperStart - maxBeamPos) / bowSpan, 0.02, 0.92);
-
-    const fullness = clamp((taperPower - 0.5) / (3 - 0.5), 0, 1);
-    const entryNorm = clamp((entryLength - 0.04) / (0.2 - 0.04), 0, 1);
-    const bluntness = clamp(noseBluntness, 0, 1);
-
-    // Timing warp (always monotonic): controls where narrowing accelerates.
-    const taperGamma = lerp(0.9, 2.3, startNorm);
-    const entryGamma = lerp(1.25, 0.78, entryNorm); // shorter entry => stubbier nose
-    const warped = Math.pow(t, taperGamma * entryGamma);
-
-    // Shape exponent: fuller shoulder carry without creating inflection shelves.
-    const bodyExp = lerp(0.95, 2.25, fullness);
-    const collapse = Math.pow(smootherstep(warped), bodyExp);
-
-    // Tip ratio: enforce physical, non-needle minimum width.
-    const minTipRatio = Math.max(baseKnifeRatio, 0.022);
-    const tipRatio = clamp(
-      minTipRatio + lerp(0, 0.14, bluntness),
-      minTipRatio,
-      0.36
-    );
-
-    factor = lerp(1.0, tipRatio, collapse);
+    const factor = lerp(sternWidth, 1.0, shaped);
+    return halfBeam * clamp(factor, sternWidth, 1.0);
   }
 
-  const minFactor = Math.max(baseKnifeRatio, 0.022);
-  return halfBeam * clamp(factor, minFactor, 1.0);
+  // BOW: Superellipse / egg-shape approach.
+  // t goes from 0 (at max-beam) to 1 (at bow tip).
+  // Width = stemHalf + (halfBeam - stemHalf) * (1 - t^n)^(1/n)
+  // where n controls the shape: n=2 is a circle/ellipse, n>2 is blunter/squarer.
+  //
+  // taperPower controls overall fullness (maps to superellipse exponent)
+  // noseBluntness further adjusts the exponent toward blunter shapes
+
+  const bowSpan = Math.max(1e-6, 1 - maxBeamPos);
+  const t = clamp((uClamped - maxBeamPos) / bowSpan, 0, 1);
+
+  // Superellipse exponent: 2.0 = ellipse, higher = blunter/more rectangular bow
+  const baseExp = lerp(1.6, 3.5, clamp(taperPower / 3, 0, 1));
+  const n = lerp(baseExp, baseExp + 1.5, clamp(noseBluntness, 0, 1));
+
+  // Superellipse: width fraction = (1 - t^n)^(1/n)
+  const tPow = Math.pow(t, n);
+  const ellipseFraction = Math.pow(Math.max(0, 1 - tPow), 1 / n);
+
+  // Interpolate between stem width and full half-beam
+  const width = stemHalf + (halfBeam - stemHalf) * ellipseFraction;
+
+  return Math.max(stemHalf, width);
 }
 
 // ============================================
