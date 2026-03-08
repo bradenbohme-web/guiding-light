@@ -152,7 +152,8 @@ export function generateDeckSheetV2(
     const deckCrown = evalDeckCrownV2(u, params);
     
     // Deck inset from rail to match lip attachment
-    const lipInset = params.lip.overhang * 0.7;
+    // IMPORTANT: inset must shrink near bow so it never exceeds halfBeam
+    const baseLipInset = params.lip.overhang * 0.7;
     
     // Stern rise: deck edges curve upward near stern
     const { sternRise, sternRiseStart } = params.deck;
@@ -162,10 +163,13 @@ export function generateDeckSheetV2(
       sternRiseAmount = sternRise * t * t; // Quadratic rise toward stern
     }
     
+    const adaptiveInset = Math.min(baseLipInset, halfBeam * 0.85);
+    const deckHalfBeam = Math.max(halfBeam - adaptiveInset, halfBeam * 0.15);
+
     for (let j = 0; j <= Nv; j++) {
       const s = j / Nv;
       const zNorm = s * 2 - 1; // -1 to 1
-      const z = zNorm * (halfBeam - lipInset);
+      const z = zNorm * deckHalfBeam;
       
       // Apply crown across beam
       const normalizedZ = Math.abs(zNorm);
