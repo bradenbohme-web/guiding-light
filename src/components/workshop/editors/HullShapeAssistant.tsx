@@ -16,9 +16,7 @@ interface HullShapeAssistantProps {
 
 interface HullShapeReviewResponse {
   analysis: string;
-  visualSummary?: string;
   model: string;
-  preprocessorModel?: string;
 }
 
 function sampleBeamStations(params: HullV2Params) {
