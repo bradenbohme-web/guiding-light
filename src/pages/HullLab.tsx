@@ -9,6 +9,8 @@ import { DEFAULT_HULL_V2_PARAMS, HullV2Params } from "@/lib/parametric/v2/types"
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { SliderControl } from "@/components/hull-lab/SliderControl";
+import { PlanformView } from "@/components/hull-lab/PlanformView";
 
 interface HullShapeReviewResponse {
   analysis: string;
@@ -51,25 +53,6 @@ export default function HullLab() {
   );
 
   const halfBeamMax = params.dimensions.beam / 2;
-  const viewWidth = 980;
-  const viewHeight = 460;
-  const pad = 28;
-  const centerY = viewHeight / 2;
-  const halfShapeHeight = (viewHeight - pad * 2) * 0.44;
-
-  const topPoints = samples.map((s) => {
-    const x = pad + s.u * (viewWidth - pad * 2);
-    const y = centerY - (s.halfBeam / halfBeamMax) * halfShapeHeight;
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
-  });
-
-  const bottomPoints = [...samples].reverse().map((s) => {
-    const x = pad + s.u * (viewWidth - pad * 2);
-    const y = centerY + (s.halfBeam / halfBeamMax) * halfShapeHeight;
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
-  });
-
-  const outlinePath = `M ${topPoints.join(" L ")} L ${bottomPoints.join(" L ")} Z`;
 
   const setNestedValue = (scope: "beam" | "bow", prop: string, value: number) => {
     setParams((prev) => ({
@@ -109,11 +92,11 @@ export default function HullLab() {
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-4 py-3">
+      <header className="border-b border-border bg-card/80 backdrop-blur">
+        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div>
-            <h1 className="text-lg font-semibold">Laser Hull Lab — Scratch Build</h1>
-            <p className="text-xs text-muted-foreground">Clean page for deterministic top-view tuning and AI diagnosis.</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Laser / ILCA</p>
+            <h1 className="text-xl font-semibold">Hull Lab — Deterministic Planform Editor</h1>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/">
@@ -123,85 +106,79 @@ export default function HullLab() {
               </Button>
             </Link>
             <Link to="/workshop">
-              <Button variant="outline" size="sm">Workshop</Button>
+              <Button variant="outline" size="sm">
+                Workshop
+              </Button>
             </Link>
           </div>
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-[1440px] gap-4 px-4 py-4 lg:grid-cols-[360px_1fr]">
-        <aside className="space-y-4 rounded-lg border border-border bg-card p-4">
-          <div className="space-y-3">
-            {controlConfig.map((cfg) => {
-              const value = Number((params[cfg.scope] as unknown as Record<string, number>)[cfg.prop]);
-              return (
-                <label key={`${cfg.scope}.${cfg.prop}`} className="block space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-foreground">{cfg.label}</span>
-                    <span className="text-muted-foreground">{value.toFixed(cfg.step < 0.01 ? 3 : 2)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={cfg.min}
-                    max={cfg.max}
-                    step={cfg.step}
-                    value={value}
-                    onChange={(e) => setNestedValue(cfg.scope, cfg.prop, Number(e.target.value))}
-                    className="w-full accent-primary"
-                  />
-                </label>
-              );
-            })}
-          </div>
-
-          <div className="space-y-2 border-t border-border pt-3">
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Describe the geometry issue you see..."
-              className="min-h-24 text-xs"
-            />
-            <Button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full" size="sm">
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Analyze Shape
-                </>
-              )}
-            </Button>
-          </div>
-
-          {analysis && (
-            <div className="space-y-2 rounded-md border border-border bg-background/60 p-3">
-              <Badge variant="secondary" className="text-[10px]">{analysis.model}</Badge>
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs leading-relaxed">
-                {analysis.analysis}
-              </pre>
+      <section className="mx-auto max-w-[1500px] px-4 py-6">
+        <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
+          <aside className="space-y-4">
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <p className="mb-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">Shape Controls</p>
+              <div className="space-y-2">
+                {controlConfig.map((cfg) => {
+                  const value = Number((params[cfg.scope] as unknown as Record<string, number>)[cfg.prop]);
+                  return (
+                    <SliderControl
+                      key={`${cfg.scope}.${cfg.prop}`}
+                      label={cfg.label}
+                      value={value}
+                      min={cfg.min}
+                      max={cfg.max}
+                      step={cfg.step}
+                      onChange={(next) => setNestedValue(cfg.scope, cfg.prop, next)}
+                    />
+                  );
+                })}
+              </div>
             </div>
-          )}
-        </aside>
 
-        <article className="rounded-lg border border-border bg-card p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-medium">Top-View Planform (SVG)</p>
-            <Button variant="outline" size="sm" onClick={() => setParams(cloneDefaults())}>Reset Defaults</Button>
-          </div>
-          <svg viewBox={`0 0 ${viewWidth} ${viewHeight}`} className="h-auto w-full rounded-md border border-border bg-background">
-            <line x1={pad} y1={centerY} x2={viewWidth - pad} y2={centerY} className="stroke-muted" strokeDasharray="5 6" />
-            <path d={outlinePath} className="fill-primary/20 stroke-primary" strokeWidth={2.5} />
-          </svg>
-          <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground sm:grid-cols-4">
-            <p>maxBeamPos: {params.beam.maxBeamPos.toFixed(2)}</p>
-            <p>sternWidth: {params.beam.sternWidth.toFixed(2)}</p>
-            <p>taperPower: {params.bow.taperPower.toFixed(2)}</p>
-            <p>noseBluntness: {params.bow.noseBluntness.toFixed(2)}</p>
-          </div>
-        </article>
+            <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">AI Shape Diagnosis</p>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Describe what still looks wrong in the planform..."
+                className="min-h-24 text-xs"
+              />
+              <Button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full" size="sm">
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Analyze Shape
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {analysis && (
+              <div className="space-y-2 rounded-2xl border border-border bg-card p-4">
+                <Badge variant="secondary" className="text-[10px]">
+                  {analysis.model}
+                </Badge>
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs leading-relaxed">
+                  {analysis.analysis}
+                </pre>
+              </div>
+            )}
+          </aside>
+
+          <PlanformView
+            samples={samples}
+            halfBeamMax={halfBeamMax}
+            params={params}
+            onReset={() => setParams(cloneDefaults())}
+          />
+        </div>
       </section>
     </main>
   );
