@@ -111,10 +111,12 @@ export function ClothSail({
         if (rigging.sail.battens.enabled) {
           for (let bi = 0; bi < battenRows.length; bi++) {
             const { row, battenUStart } = battenRows[bi];
+            // Per-batten stiffness: use stiffnesses[] if available, fallback to global
+            const perBattenStiff = rigging.sail.battens.stiffnesses?.[bi] ?? rigging.sail.battens.stiffness;
 
             // Single-row membership prevents zigzagging across adjacent rows
             if (j === row && u >= battenUStart) {
-              battenStiffness = Math.max(battenStiffness, rigging.sail.battens.stiffness * 2);
+              battenStiffness = Math.max(battenStiffness, perBattenStiff * 2);
 
               // Track batten points in row order for stable constraints
               if (!battenPtIndices[bi]) battenPtIndices[bi] = [];
