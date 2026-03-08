@@ -809,7 +809,7 @@ export function useLaserHullUltimateGeometries(overrides?: Partial<LaserHullUlti
   }, [JSON.stringify(overrides ?? {})]);
 }
 
-export type LaserHullUltimateModelProps = MeshProps & {
+export type LaserHullUltimateModelProps = GroupProps & {
   params?: Partial<LaserHullUltimateParams>;
   color?: THREE.ColorRepresentation;
   detailColor?: THREE.ColorRepresentation;
