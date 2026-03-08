@@ -111,10 +111,12 @@ export function ClothSail({
         if (rigging.sail.battens.enabled) {
           for (let bi = 0; bi < battenRows.length; bi++) {
             const { row, battenUStart } = battenRows[bi];
+            // Per-batten stiffness: use stiffnesses[] if available, fallback to global
+            const perBattenStiff = rigging.sail.battens.stiffnesses?.[bi] ?? rigging.sail.battens.stiffness;
 
             // Single-row membership prevents zigzagging across adjacent rows
             if (j === row && u >= battenUStart) {
-              battenStiffness = Math.max(battenStiffness, rigging.sail.battens.stiffness * 2);
+              battenStiffness = Math.max(battenStiffness, perBattenStiff * 2);
 
               // Track batten points in row order for stable constraints
               if (!battenPtIndices[bi]) battenPtIndices[bi] = [];
@@ -253,8 +255,9 @@ export function ClothSail({
       battenPtIndices.forEach((battenPts, bi) => {
         if (!battenPts || battenPts.length < 3) return;
 
-        // Stiffness in 0..1 range from rigging, map to strong constraint
-        const k = 0.45 + (rigging.sail.battens.stiffness ?? 0.8) * 0.3;
+        // Per-batten stiffness with fallback
+        const rawStiff = rigging.sail.battens.stiffnesses?.[bi] ?? rigging.sail.battens.stiffness ?? 0.8;
+        const k = 0.45 + rawStiff * 0.3;
 
         for (let ii = 0; ii < battenPts.length - 1; ii++) {
           const p1 = battenPts[ii];

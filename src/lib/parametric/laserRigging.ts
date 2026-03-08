@@ -38,7 +38,8 @@ export interface SailBattenParams {
   count: number;            // Laser has 4 battens
   positions: number[];      // Fractional positions along luff [0..1]
   lengths: number[];        // Length of each batten in meters
-  stiffness: number;        // 0..1
+  stiffness: number;        // Global fallback 0..1
+  stiffnesses: number[];    // Per-batten stiffness overrides 0..1
 }
 
 export interface SailWindowParams {
@@ -289,7 +290,8 @@ export const DEFAULT_LASER_RIGGING: LaserRiggingParams = {
       count: 4,
       positions: [0.25, 0.45, 0.65, 0.85],
       lengths: [0.9, 0.75, 0.55, 0.35],
-      stiffness: 0.8
+      stiffness: 0.8,
+      stiffnesses: [0.8, 0.8, 0.7, 0.6],
     },
     window: {
       enabled: true,
