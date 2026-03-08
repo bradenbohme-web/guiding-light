@@ -172,11 +172,18 @@ const Workshop = () => {
             </div>
           </div>
         </div>
-        <Link to="/hull-lab">
-          <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
-            🧪 Hull Lab
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/sail-rig">
+            <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+              ⛵ Sail Rig
+            </Button>
+          </Link>
+          <Link to="/hull-lab">
+            <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+              🧪 Hull Lab
+            </Button>
+          </Link>
+        </div>
       </header>
 
       {/* Main Content */}
