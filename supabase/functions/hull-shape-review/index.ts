@@ -7,8 +7,7 @@ const corsHeaders = {
 };
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const ANALYSIS_MODEL = "google/gemini-2.5-pro";
-const PREPROCESS_MODEL = "google/gemini-2.5-flash";
+const ANALYSIS_MODEL = "google/gemini-2.5-flash";
 
 type ContentPart =
   | { type: "text"; text: string }
