@@ -52,7 +52,7 @@ const EVAL_BEAM_V2_SOURCE = `
 function evalBeamV2(u, params) {
   const { beam } = params.dimensions;
   const { sternWidth, maxBeamPos, sternBlend, interpolation } = params.beam;
-  const { knifeWidth, taperPower, noseBluntness = 0.45 } = params.bow;
+  const { knifeWidth, taperPower, noseBluntness = 0.25 } = params.bow;
 
   const halfBeam = beam / 2;
   const uClamped = clamp(u, 0, 1);
@@ -68,14 +68,13 @@ function evalBeamV2(u, params) {
     return halfBeam * clamp(factor, sternWidth, 1.0);
   }
 
-  // BOW region: Superellipse
+  // BOW region: Laser-class superellipse
   const bowSpan = Math.max(1e-6, 1 - maxBeamPos);
   const t = clamp((uClamped - maxBeamPos) / bowSpan, 0, 1);
-  const baseExp = lerp(1.6, 3.5, clamp(taperPower / 3, 0, 1));
-  const n = lerp(baseExp, baseExp + 1.5, clamp(noseBluntness, 0, 1));
-  const tPow = Math.pow(t, n);
-  const ellipseFraction = Math.pow(Math.max(0, 1 - tPow), 1 / n);
-  const width = stemHalf + (halfBeam - stemHalf) * ellipseFraction;
+  const n = lerp(2.0, 2.6, clamp(taperPower / 3, 0, 1));
+  const ellipseFraction = Math.pow(Math.max(0, 1 - Math.pow(t, n)), 1 / n);
+  const smoothT = lerp(ellipseFraction, 1 - t, clamp(noseBluntness, 0, 1) * 0.5);
+  const width = stemHalf + (halfBeam - stemHalf) * smoothT;
   return Math.max(stemHalf, width);
 }
 `;
