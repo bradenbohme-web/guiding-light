@@ -534,53 +534,41 @@ export function ClothSail({
     });
   }, [rigging.sail.battens, luffLength, footLength, battenPointIndices]);
 
-  // Dynamic batten meshes that follow the cloth surface
+  // Dynamic batten meshes that follow the cloth surface as curved strips
   const BattenMesh = ({ batten }: { batten: (typeof battenMeshes)[number] }) => {
-    const meshRef = useRef<THREE.Mesh>(null);
-    const tempVec = useRef(new THREE.Vector3());
+    const tubeRef = useRef<THREE.Mesh>(null);
+    const battenRadius = 0.009;
+    const radialSegments = 4;
 
     useFrame(() => {
-      if (!meshRef.current || batten.pointIndices.length < 2 || pointsRef.current.length === 0) return;
+      if (!tubeRef.current || batten.pointIndices.length < 2 || pointsRef.current.length === 0) return;
 
       const pts = pointsRef.current;
       const indices = batten.pointIndices;
 
-      // Get positions of batten points
-      let avgX = 0,
-        avgY = 0,
-        avgZ = 0;
-      let count = 0;
-
-      indices.forEach((idx) => {
+      // Build a curve from the actual cloth simulation points
+      const curvePoints: THREE.Vector3[] = [];
+      for (const idx of indices) {
         if (pts[idx]) {
-          avgX += pts[idx].position.x;
-          avgY += pts[idx].position.y;
-          avgZ += pts[idx].position.z;
-          count++;
-        }
-      });
-
-      if (count > 0) {
-        // Set position
-        meshRef.current.position.set(avgX / count, avgY / count, avgZ / count + 0.005);
-
-        // Orientation from first and last batten points
-        const firstPt = pts[indices[0]];
-        const lastPt = pts[indices[indices.length - 1]];
-        if (firstPt && lastPt) {
-          const dir = tempVec.current.subVectors(lastPt.position, firstPt.position).normalize();
-          const up = new THREE.Vector3(0, 1, 0);
-          const right = new THREE.Vector3().crossVectors(up, dir).normalize();
-          const adjustedUp = new THREE.Vector3().crossVectors(dir, right);
-          const rotMatrix = new THREE.Matrix4().makeBasis(dir, adjustedUp, right);
-          meshRef.current.quaternion.setFromRotationMatrix(rotMatrix);
+          // Offset slightly above sail surface so batten sits on top
+          curvePoints.push(pts[idx].position.clone().add(new THREE.Vector3(0, 0, 0.006)));
         }
       }
+
+      if (curvePoints.length < 2) return;
+
+      // Create a smooth curve through the cloth points
+      const curve = new THREE.CatmullRomCurve3(curvePoints, false, 'centripetal', 0.5);
+      const tubeGeo = new THREE.TubeGeometry(curve, Math.max(curvePoints.length * 2, 8), battenRadius, radialSegments, false);
+
+      // Swap geometry
+      tubeRef.current.geometry.dispose();
+      tubeRef.current.geometry = tubeGeo;
     });
 
     return (
-      <mesh ref={meshRef} position={[batten.x, batten.y, 0.005]}>
-        <boxGeometry args={[batten.length, 0.018, 0.004]} />
+      <mesh ref={tubeRef}>
+        <tubeGeometry args={[new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,0), new THREE.Vector3(0.1,0,0)]), 4, battenRadius, radialSegments, false]} />
         <meshStandardMaterial color="hsl(0, 0%, 25%)" roughness={0.5} />
       </mesh>
     );
