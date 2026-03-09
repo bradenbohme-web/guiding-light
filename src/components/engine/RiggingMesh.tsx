@@ -328,12 +328,14 @@ function PulleyMesh({
   pulley,
   showWireframe,
   boomAngle,
-  rigging
+  rigging,
+  onClick
 }: {
   pulley: LaserRiggingParams['pulleys'][0];
   showWireframe: boolean;
   boomAngle: number;
   rigging: LaserRiggingParams;
+  onClick?: (e: any) => void;
 }) {
   // Transform position based on attachment
   const position = useMemo(() => {
