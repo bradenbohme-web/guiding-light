@@ -322,6 +322,18 @@ const SailRig = () => {
     if (selectedObj.type === "pulley") return updatePulleyWorld(selectedObj.index, x, y, z);
   }, [selectedObj, updateMastPos, updateBoomPos, updateTravelerPos, updateHardpointWorld, updatePulleyWorld]);
 
+  const handleSceneClick = useCallback((target: { type: string; index?: number }) => {
+    const asSelection: ObjectSelection = target.index !== undefined
+      ? { type: target.type as "hardpoint" | "pulley", index: target.index }
+      : { type: target.type as "mast" | "boom" | "traveler" };
+
+    // Toggle: click same object again to deselect
+    setSelectedObj((prev) => {
+      if (selectionKey(prev) === selectionKey(asSelection)) return null;
+      return asSelection;
+    });
+  }, []);
+
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
