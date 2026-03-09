@@ -14,6 +14,7 @@ interface RiggingMeshProps {
   windAngle?: number;
   windStrength?: number;
   highlightTarget?: string | null;
+  onObjectClick?: (target: { type: string; index?: number }) => void;
 }
 
 // Mast Component with tapered cylinder and pre-bend
