@@ -355,7 +355,7 @@ function PulleyMesh({
   return (
     <group position={position}>
       {/* Block housing */}
-      <mesh>
+      <mesh onClick={(e) => { e.stopPropagation(); onClick?.(e); }}>
         <boxGeometry args={[0.03, 0.05 * sheaveCount, 0.025]} />
         <meshStandardMaterial
           color={pulley.color}
