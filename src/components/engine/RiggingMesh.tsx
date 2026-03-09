@@ -413,14 +413,25 @@ export function RiggingMesh({
   rudderAngle = 0,
   windAngle = 0,
   windStrength = 0.5,
-  highlightTarget = null
+  highlightTarget = null,
+  onObjectClick
 }: RiggingMeshProps) {
   return (
     <group>
-      <MastMesh rigging={rigging} showWireframe={showWireframe} highlight={highlightTarget === "mast"} />
-      <BoomMesh rigging={rigging} showWireframe={showWireframe} angle={boomAngle} highlight={highlightTarget === "boom"} />
+      <MastMesh
+        rigging={rigging}
+        showWireframe={showWireframe}
+        highlight={highlightTarget === "mast"}
+        onClick={() => onObjectClick?.({ type: "mast" })}
+      />
+      <BoomMesh
+        rigging={rigging}
+        showWireframe={showWireframe}
+        angle={boomAngle}
+        highlight={highlightTarget === "boom"}
+        onClick={() => onObjectClick?.({ type: "boom" })}
+      />
 
-      {/* Cloth-simulated sail */}
       <ClothSail
         rigging={rigging}
         boomAngle={boomAngle}
@@ -430,7 +441,6 @@ export function RiggingMesh({
         highlight={highlightTarget === "sail"}
       />
 
-      {/* Rope lines with catenary */}
       <RopeLines
         rigging={rigging}
         boomAngle={boomAngle}
@@ -438,7 +448,6 @@ export function RiggingMesh({
         highlight={highlightTarget === "ropes"}
       />
 
-      {/* Traveler system */}
       <TravelerSystem
         traveler={rigging.traveler}
         showWireframe={showWireframe}
@@ -449,14 +458,14 @@ export function RiggingMesh({
       <RudderMesh rigging={rigging} showWireframe={showWireframe} angle={rudderAngle} highlight={highlightTarget === "rudder"} />
       <HikingStrap />
 
-      {/* Pulleys */}
-      {rigging.pulleys.map((pulley) => (
+      {rigging.pulleys.map((pulley, i) => (
         <PulleyMesh
           key={pulley.id}
           pulley={pulley}
           showWireframe={showWireframe}
           boomAngle={boomAngle}
           rigging={rigging}
+          onClick={() => onObjectClick?.({ type: "pulley", index: i })}
         />
       ))}
     </group>
