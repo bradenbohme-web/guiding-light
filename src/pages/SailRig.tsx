@@ -157,6 +157,7 @@ function SailRigScene({
   showHardpoints,
   selectedObj,
   onGizmoDrag,
+  onObjectClick,
   cameraTarget,
 }: {
   rigging: LaserRiggingParams;
@@ -169,6 +170,7 @@ function SailRigScene({
   showHardpoints: boolean;
   selectedObj: ObjectSelection;
   onGizmoDrag: (x: number, y: number, z: number) => void;
+  onObjectClick: (target: { type: string; index?: number }) => void;
   cameraTarget: THREE.Vector3;
 }) {
   const boomRad = (boomAngle / 180) * Math.PI;
@@ -206,7 +208,8 @@ function SailRigScene({
           rudderAngle={0}
           windAngle={windAngle}
           windStrength={windStrength}
-          highlightTarget={null}
+          highlightTarget={selectedObj ? selectionKey(selectedObj) : null}
+          onObjectClick={onObjectClick}
         />
 
         <HardpointMarkers rigging={rigging} boomRad={boomRad} visible={showHardpoints} />
@@ -318,6 +321,18 @@ const SailRig = () => {
     if (selectedObj.type === "hardpoint") return updateHardpointWorld(selectedObj.index, x, y, z);
     if (selectedObj.type === "pulley") return updatePulleyWorld(selectedObj.index, x, y, z);
   }, [selectedObj, updateMastPos, updateBoomPos, updateTravelerPos, updateHardpointWorld, updatePulleyWorld]);
+
+  const handleSceneClick = useCallback((target: { type: string; index?: number }) => {
+    const asSelection: ObjectSelection = target.index !== undefined
+      ? { type: target.type as "hardpoint" | "pulley", index: target.index }
+      : { type: target.type as "mast" | "boom" | "traveler" };
+
+    // Toggle: click same object again to deselect
+    setSelectedObj((prev) => {
+      if (selectionKey(prev) === selectionKey(asSelection)) return null;
+      return asSelection;
+    });
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
@@ -530,6 +545,7 @@ const SailRig = () => {
               showHardpoints={showHardpoints}
               selectedObj={selectedObj}
               onGizmoDrag={onGizmoDrag}
+              onObjectClick={handleSceneClick}
               cameraTarget={cameraTarget}
             />
           </Canvas>

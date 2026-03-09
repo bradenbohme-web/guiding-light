@@ -14,10 +14,11 @@ interface RiggingMeshProps {
   windAngle?: number;
   windStrength?: number;
   highlightTarget?: string | null;
+  onObjectClick?: (target: { type: string; index?: number }) => void;
 }
 
 // Mast Component with tapered cylinder and pre-bend
-function MastMesh({ rigging, showWireframe, highlight }: { rigging: LaserRiggingParams; showWireframe: boolean; highlight: boolean }) {
+function MastMesh({ rigging, showWireframe, highlight, onClick }: { rigging: LaserRiggingParams; showWireframe: boolean; highlight: boolean; onClick?: (e: any) => void }) {
   const geometry = useMemo(() => {
     const { height, baseRadius, tipRadius, bend } = rigging.mast;
     const segments = 32;
@@ -49,6 +50,7 @@ function MastMesh({ rigging, showWireframe, highlight }: { rigging: LaserRigging
         rigging.mast.position.y + rigging.mast.height / 2,
         rigging.mast.position.z,
       ]}
+      onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
     >
       <meshStandardMaterial
         color={rigging.mast.color}
@@ -67,12 +69,14 @@ function BoomMesh({
   rigging,
   showWireframe,
   angle = 0,
-  highlight
+  highlight,
+  onClick
 }: {
   rigging: LaserRiggingParams;
   showWireframe: boolean;
   angle: number;
   highlight: boolean;
+  onClick?: (e: any) => void;
 }) {
   const geometry = useMemo(() => {
     const { length, radius } = rigging.boom;
@@ -91,6 +95,7 @@ function BoomMesh({
         geometry={geometry}
         position={[-rigging.boom.length / 2, 0, 0]}
         rotation={[0, 0, Math.PI / 2]}
+        onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
       >
         <meshStandardMaterial
           color={rigging.boom.color}
@@ -323,12 +328,14 @@ function PulleyMesh({
   pulley,
   showWireframe,
   boomAngle,
-  rigging
+  rigging,
+  onClick
 }: {
   pulley: LaserRiggingParams['pulleys'][0];
   showWireframe: boolean;
   boomAngle: number;
   rigging: LaserRiggingParams;
+  onClick?: (e: any) => void;
 }) {
   // Transform position based on attachment
   const position = useMemo(() => {
@@ -351,7 +358,7 @@ function PulleyMesh({
   return (
     <group position={position}>
       {/* Block housing */}
-      <mesh>
+      <mesh onClick={(e) => { e.stopPropagation(); onClick?.(e); }}>
         <boxGeometry args={[0.03, 0.05 * sheaveCount, 0.025]} />
         <meshStandardMaterial
           color={pulley.color}
@@ -408,14 +415,25 @@ export function RiggingMesh({
   rudderAngle = 0,
   windAngle = 0,
   windStrength = 0.5,
-  highlightTarget = null
+  highlightTarget = null,
+  onObjectClick
 }: RiggingMeshProps) {
   return (
     <group>
-      <MastMesh rigging={rigging} showWireframe={showWireframe} highlight={highlightTarget === "mast"} />
-      <BoomMesh rigging={rigging} showWireframe={showWireframe} angle={boomAngle} highlight={highlightTarget === "boom"} />
+      <MastMesh
+        rigging={rigging}
+        showWireframe={showWireframe}
+        highlight={highlightTarget === "mast"}
+        onClick={() => onObjectClick?.({ type: "mast" })}
+      />
+      <BoomMesh
+        rigging={rigging}
+        showWireframe={showWireframe}
+        angle={boomAngle}
+        highlight={highlightTarget === "boom"}
+        onClick={() => onObjectClick?.({ type: "boom" })}
+      />
 
-      {/* Cloth-simulated sail */}
       <ClothSail
         rigging={rigging}
         boomAngle={boomAngle}
@@ -425,7 +443,6 @@ export function RiggingMesh({
         highlight={highlightTarget === "sail"}
       />
 
-      {/* Rope lines with catenary */}
       <RopeLines
         rigging={rigging}
         boomAngle={boomAngle}
@@ -433,7 +450,6 @@ export function RiggingMesh({
         highlight={highlightTarget === "ropes"}
       />
 
-      {/* Traveler system */}
       <TravelerSystem
         traveler={rigging.traveler}
         showWireframe={showWireframe}
@@ -444,14 +460,14 @@ export function RiggingMesh({
       <RudderMesh rigging={rigging} showWireframe={showWireframe} angle={rudderAngle} highlight={highlightTarget === "rudder"} />
       <HikingStrap />
 
-      {/* Pulleys */}
-      {rigging.pulleys.map((pulley) => (
+      {rigging.pulleys.map((pulley, i) => (
         <PulleyMesh
           key={pulley.id}
           pulley={pulley}
           showWireframe={showWireframe}
           boomAngle={boomAngle}
           rigging={rigging}
+          onClick={() => onObjectClick?.({ type: "pulley", index: i })}
         />
       ))}
     </group>
