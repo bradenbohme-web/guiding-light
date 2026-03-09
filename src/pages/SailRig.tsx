@@ -208,7 +208,8 @@ function SailRigScene({
           rudderAngle={0}
           windAngle={windAngle}
           windStrength={windStrength}
-          highlightTarget={null}
+          highlightTarget={selectedObj ? selectionKey(selectedObj) : null}
+          onObjectClick={onObjectClick}
         />
 
         <HardpointMarkers rigging={rigging} boomRad={boomRad} visible={showHardpoints} />
