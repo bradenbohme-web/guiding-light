@@ -94,6 +94,7 @@ function BoomMesh({
         geometry={geometry}
         position={[-rigging.boom.length / 2, 0, 0]}
         rotation={[0, 0, Math.PI / 2]}
+        onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
       >
         <meshStandardMaterial
           color={rigging.boom.color}
