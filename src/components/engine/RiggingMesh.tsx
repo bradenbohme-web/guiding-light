@@ -69,7 +69,8 @@ function BoomMesh({
   rigging,
   showWireframe,
   angle = 0,
-  highlight
+  highlight,
+  onClick
 }: {
   rigging: LaserRiggingParams;
   showWireframe: boolean;
