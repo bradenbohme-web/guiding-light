@@ -76,6 +76,7 @@ function BoomMesh({
   showWireframe: boolean;
   angle: number;
   highlight: boolean;
+  onClick?: (e: any) => void;
 }) {
   const geometry = useMemo(() => {
     const { length, radius } = rigging.boom;
