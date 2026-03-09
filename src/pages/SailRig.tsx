@@ -533,6 +533,7 @@ const SailRig = () => {
               showHardpoints={showHardpoints}
               selectedObj={selectedObj}
               onGizmoDrag={onGizmoDrag}
+              onObjectClick={handleSceneClick}
               cameraTarget={cameraTarget}
             />
           </Canvas>
