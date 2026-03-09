@@ -50,6 +50,7 @@ function MastMesh({ rigging, showWireframe, highlight, onClick }: { rigging: Las
         rigging.mast.position.y + rigging.mast.height / 2,
         rigging.mast.position.z,
       ]}
+      onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
     >
       <meshStandardMaterial
         color={rigging.mast.color}
