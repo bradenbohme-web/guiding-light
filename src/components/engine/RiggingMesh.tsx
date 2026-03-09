@@ -18,7 +18,7 @@ interface RiggingMeshProps {
 }
 
 // Mast Component with tapered cylinder and pre-bend
-function MastMesh({ rigging, showWireframe, highlight }: { rigging: LaserRiggingParams; showWireframe: boolean; highlight: boolean }) {
+function MastMesh({ rigging, showWireframe, highlight, onClick }: { rigging: LaserRiggingParams; showWireframe: boolean; highlight: boolean; onClick?: (e: any) => void }) {
   const geometry = useMemo(() => {
     const { height, baseRadius, tipRadius, bend } = rigging.mast;
     const segments = 32;
