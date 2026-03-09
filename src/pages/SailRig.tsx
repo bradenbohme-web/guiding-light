@@ -157,6 +157,7 @@ function SailRigScene({
   showHardpoints,
   selectedObj,
   onGizmoDrag,
+  onObjectClick,
   cameraTarget,
 }: {
   rigging: LaserRiggingParams;
@@ -169,6 +170,7 @@ function SailRigScene({
   showHardpoints: boolean;
   selectedObj: ObjectSelection;
   onGizmoDrag: (x: number, y: number, z: number) => void;
+  onObjectClick: (target: { type: string; index?: number }) => void;
   cameraTarget: THREE.Vector3;
 }) {
   const boomRad = (boomAngle / 180) * Math.PI;
