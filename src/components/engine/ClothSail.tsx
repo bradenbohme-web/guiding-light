@@ -507,6 +507,43 @@ export function ClothSail({
       });
     }
 
+    // Self-collision pass (spatial hash)
+    if (rigging.sail.collisionEnabled) {
+      const threshold = rigging.sail.collisionThreshold ?? 0.015;
+      const thresholdSq = threshold * threshold;
+      // Simple O(n²) collision for moderate mesh sizes
+      for (let a = 0; a < pts.length; a++) {
+        if (pts[a].fixed) continue;
+        for (let b = a + 2; b < pts.length; b++) {
+          if (pts[b].fixed) continue;
+          // Skip adjacent particles (within 2 indices in same row or column)
+          const rowA = Math.floor(a / (segW + 1));
+          const colA = a % (segW + 1);
+          const rowB = Math.floor(b / (segW + 1));
+          const colB = b % (segW + 1);
+          if (Math.abs(rowA - rowB) <= 1 && Math.abs(colA - colB) <= 1) continue;
+
+          const dx = pts[b].position.x - pts[a].position.x;
+          const dy = pts[b].position.y - pts[a].position.y;
+          const dz = pts[b].position.z - pts[a].position.z;
+          const distSq = dx * dx + dy * dy + dz * dz;
+          if (distSq < thresholdSq && distSq > 1e-10) {
+            const dist = Math.sqrt(distSq);
+            const overlap = (threshold - dist) * 0.5;
+            const nx = dx / dist * overlap;
+            const ny = dy / dist * overlap;
+            const nz = dz / dist * overlap;
+            pts[a].position.x -= nx;
+            pts[a].position.y -= ny;
+            pts[a].position.z -= nz;
+            pts[b].position.x += nx;
+            pts[b].position.y += ny;
+            pts[b].position.z += nz;
+          }
+        }
+      }
+    }
+
     // Update geometry
     const posAttr = geometryRef.current.getAttribute('position') as THREE.BufferAttribute;
     pts.forEach((p, i) => {
