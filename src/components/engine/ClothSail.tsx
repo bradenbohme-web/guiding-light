@@ -45,7 +45,8 @@ export function ClothSail({
   windAngle,
   windStrength,
   showWireframe = false,
-  highlight = false
+  highlight = false,
+  onClick,
 }: ClothSailProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
