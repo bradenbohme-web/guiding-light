@@ -111,7 +111,7 @@ export function RopeEditor({ rigging, onChange, boomAngle, onBoomAngleChange }: 
             </mesh>
           </group>
 
-          <RopeLines rigging={rigging} boomAngle={boomRad} highlight={false} />
+          <RopeLines rigging={rigging} boomAngle={boomRad} />
         </SubsystemViewport>
       </div>
     </div>
