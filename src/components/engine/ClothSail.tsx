@@ -491,8 +491,8 @@ export function ClothSail({
     });
 
     // Satisfy constraints
-    const iterations = 5;
-    for (let iter = 0; iter < iterations; iter++) {
+    const constraintIterations = iterations;
+    for (let iter = 0; iter < constraintIterations; iter++) {
       constraints.forEach((c) => {
         const p1 = pts[c.p1];
         const p2 = pts[c.p2];
