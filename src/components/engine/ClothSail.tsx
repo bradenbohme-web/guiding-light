@@ -13,6 +13,7 @@ interface ClothSailProps {
   windStrength: number;
   showWireframe?: boolean;
   highlight?: boolean;
+  onClick?: () => void;
 }
 
 interface ClothPoint {
