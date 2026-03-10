@@ -1,5 +1,5 @@
-// Sail Rig Integration Page — full coordinate control for all rigging objects (world-space editing)
-import { Suspense, useCallback, useMemo, useState } from "react";
+// Sail Rig Integration Page — focused on sail system with right detail drawer
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Grid, GizmoHelper, GizmoViewport } from "@react-three/drei";
@@ -7,8 +7,8 @@ import * as THREE from "three";
 
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING, Hardpoint, PulleyParams } from "@/lib/parametric/laserRigging";
 import { RiggingMesh } from "@/components/engine/RiggingMesh";
-import { CoordinateInput } from "@/components/engine/CoordinateInput";
 import { TransformGizmo } from "@/components/engine/TransformGizmo";
+import { ObjectDetailDrawer } from "@/components/engine/ObjectDetailDrawer";
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -16,62 +16,53 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ArrowLeft, Sailboat, Eye, Crosshair } from "lucide-react";
+import { ChevronDown, ArrowLeft, Sailboat, Eye } from "lucide-react";
 
-type ObjectSelection =
+export type ObjectSelection =
   | { type: "mast" }
   | { type: "boom" }
+  | { type: "sail" }
   | { type: "traveler" }
   | { type: "hardpoint"; index: number }
   | { type: "pulley"; index: number }
+  | { type: "rope"; index: number }
   | null;
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
+// IDs that belong to removed subsystems
+const EXCLUDED_HARDPOINT_IDS = new Set([
+  "rudder_pivot", "tiller_attach", "extension_hinge",
+  "hiking_strap_bow", "hiking_strap_stern", "centerboard_trunk",
+]);
+
 function selectionKey(s: ObjectSelection): string {
   if (!s) return "";
-  if (s.type === "hardpoint" || s.type === "pulley") return `${s.type}-${s.index}`;
+  if ("index" in s) return `${s.type}-${s.index}`;
   return s.type;
 }
 
-function toWorldFromAttach(
-  local: THREE.Vector3,
-  attach: Hardpoint["attach"] | PulleyParams["attach"],
-  rigging: LaserRiggingParams,
-  boomRad: number
-) {
-  if (attach === "boom") {
-    return local.clone().applyAxisAngle(Y_AXIS, boomRad).add(rigging.boom.position.clone());
-  }
-  if (attach === "mast") {
-    return local.clone().add(rigging.mast.position.clone());
-  }
+function highlightTarget(s: ObjectSelection, rigging: LaserRiggingParams): string | null {
+  if (!s) return null;
+  if (s.type === "rope") return `rope-${rigging.ropes[s.index]?.id ?? ""}`;
+  if ("index" in s) return `${s.type}-${s.index}`;
+  return s.type;
+}
+
+function toWorldFromAttach(local: THREE.Vector3, attach: Hardpoint["attach"] | PulleyParams["attach"], rigging: LaserRiggingParams, boomRad: number) {
+  if (attach === "boom") return local.clone().applyAxisAngle(Y_AXIS, boomRad).add(rigging.boom.position.clone());
+  if (attach === "mast") return local.clone().add(rigging.mast.position.clone());
   return local.clone();
 }
 
-function fromWorldToAttach(
-  world: THREE.Vector3,
-  attach: Hardpoint["attach"] | PulleyParams["attach"],
-  rigging: LaserRiggingParams,
-  boomRad: number
-) {
-  if (attach === "boom") {
-    return world.clone().sub(rigging.boom.position.clone()).applyAxisAngle(Y_AXIS, -boomRad);
-  }
-  if (attach === "mast") {
-    return world.clone().sub(rigging.mast.position.clone());
-  }
+function fromWorldToAttach(world: THREE.Vector3, attach: Hardpoint["attach"] | PulleyParams["attach"], rigging: LaserRiggingParams, boomRad: number) {
+  if (attach === "boom") return world.clone().sub(rigging.boom.position.clone()).applyAxisAngle(Y_AXIS, -boomRad);
+  if (attach === "mast") return world.clone().sub(rigging.mast.position.clone());
   return world.clone();
 }
 
 function S({ label, value, min, max, step, unit, onChange }: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  unit?: string;
-  onChange: (v: number) => void;
+  label: string; value: number; min: number; max: number; step: number; unit?: string; onChange: (v: number) => void;
 }) {
   return (
     <div className="space-y-1.5">
@@ -88,7 +79,6 @@ function WindArrow({ windAngle, windStrength }: { windAngle: number; windStrengt
   const dir = new THREE.Vector3(Math.sin(windAngle), 0, Math.cos(windAngle));
   const len = 1 + windStrength * 2;
   const start = dir.clone().multiplyScalar(-3);
-
   return (
     <group position={[start.x, 3, start.z]}>
       <arrowHelper args={[dir, new THREE.Vector3(0, 0, 0), len, 0x3b82f6, 0.2, 0.1]} />
@@ -100,10 +90,9 @@ function WindArrow({ windAngle, windStrength }: { windAngle: number; windStrengt
 
 function HardpointMarkers({ rigging, boomRad, visible }: { rigging: LaserRiggingParams; boomRad: number; visible: boolean }) {
   if (!visible) return null;
-
   return (
     <group>
-      {rigging.hardpoints.map((hp) => {
+      {rigging.hardpoints.filter((hp) => !EXCLUDED_HARDPOINT_IDS.has(hp.id)).map((hp) => {
         const pos = toWorldFromAttach(hp.position, hp.attach, rigging, boomRad);
         return (
           <mesh key={hp.id} position={[pos.x, pos.y, pos.z]}>
@@ -118,60 +107,64 @@ function HardpointMarkers({ rigging, boomRad, visible }: { rigging: LaserRigging
 
 function getSelectedWorldPos(rigging: LaserRiggingParams, selected: ObjectSelection, boomRad: number): [number, number, number] | null {
   if (!selected) return null;
-
-  if (selected.type === "mast") {
-    const p = rigging.mast.position;
-    return [p.x, p.y, p.z];
-  }
-
-  if (selected.type === "boom") {
-    const p = rigging.boom.position;
-    return [p.x, p.y, p.z];
-  }
-
-  if (selected.type === "traveler") {
-    return [rigging.traveler.x, rigging.traveler.y, rigging.traveler.carZ];
-  }
-
+  if (selected.type === "mast") { const p = rigging.mast.position; return [p.x, p.y, p.z]; }
+  if (selected.type === "boom") { const p = rigging.boom.position; return [p.x, p.y, p.z]; }
+  if (selected.type === "traveler") return [rigging.traveler.x, rigging.traveler.y, rigging.traveler.carZ];
+  if (selected.type === "sail" || selected.type === "rope") return null;
   if (selected.type === "hardpoint") {
     const hp = rigging.hardpoints[selected.index];
     if (!hp) return null;
     const p = toWorldFromAttach(hp.position, hp.attach, rigging, boomRad);
     return [p.x, p.y, p.z];
   }
-
-  const pulley = rigging.pulleys[selected.index];
-  if (!pulley) return null;
-  const p = toWorldFromAttach(pulley.position, pulley.attach, rigging, boomRad);
-  return [p.x, p.y, p.z];
+  if (selected.type === "pulley") {
+    const pulley = rigging.pulleys[selected.index];
+    if (!pulley) return null;
+    const p = toWorldFromAttach(pulley.position, pulley.attach, rigging, boomRad);
+    return [p.x, p.y, p.z];
+  }
+  return null;
 }
 
+// ── localStorage persistence ──
+const STORAGE_KEY = "sailrig-rigging-state";
+
+function serializeRigging(r: LaserRiggingParams): string {
+  return JSON.stringify(r, (_, v) => {
+    if (v instanceof THREE.Vector3) return { __v3: true, x: v.x, y: v.y, z: v.z };
+    return v;
+  });
+}
+
+function deserializeRigging(json: string): LaserRiggingParams | null {
+  try {
+    return JSON.parse(json, (_, v) => {
+      if (v && typeof v === "object" && v.__v3) return new THREE.Vector3(v.x, v.y, v.z);
+      return v;
+    });
+  } catch { return null; }
+}
+
+function loadSavedRigging(): LaserRiggingParams {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = deserializeRigging(saved);
+      if (parsed) return parsed;
+    }
+  } catch { /* ignore */ }
+  return { ...DEFAULT_LASER_RIGGING };
+}
+
+// ── 3D Scene ──
 function SailRigScene({
-  rigging,
-  boomAngle,
-  windAngle,
-  windStrength,
-  showWireframe,
-  showWindArrows,
-  showGrid,
-  showHardpoints,
-  selectedObj,
-  onGizmoDrag,
-  onObjectClick,
-  cameraTarget,
+  rigging, boomAngle, windAngle, windStrength, showWireframe, showWindArrows, showGrid, showHardpoints,
+  selectedObj, onGizmoDrag, onObjectClick, cameraTarget,
 }: {
-  rigging: LaserRiggingParams;
-  boomAngle: number;
-  windAngle: number;
-  windStrength: number;
-  showWireframe: boolean;
-  showWindArrows: boolean;
-  showGrid: boolean;
-  showHardpoints: boolean;
-  selectedObj: ObjectSelection;
-  onGizmoDrag: (x: number, y: number, z: number) => void;
-  onObjectClick: (target: { type: string; index?: number }) => void;
-  cameraTarget: THREE.Vector3;
+  rigging: LaserRiggingParams; boomAngle: number; windAngle: number; windStrength: number;
+  showWireframe: boolean; showWindArrows: boolean; showGrid: boolean; showHardpoints: boolean;
+  selectedObj: ObjectSelection; onGizmoDrag: (x: number, y: number, z: number) => void;
+  onObjectClick: (target: { type: string; index?: number }) => void; cameraTarget: THREE.Vector3;
 }) {
   const boomRad = (boomAngle / 180) * Math.PI;
   const [isDragging, setIsDragging] = useState(false);
@@ -186,18 +179,8 @@ function SailRigScene({
       <hemisphereLight args={["hsl(210, 40%, 80%)", "hsl(30, 20%, 30%)", 0.35]} />
 
       {showGrid && (
-        <Grid
-          args={[10, 10]}
-          cellSize={0.25}
-          cellThickness={0.5}
-          cellColor="hsl(215, 20%, 25%)"
-          sectionSize={1}
-          sectionThickness={1}
-          sectionColor="hsl(215, 25%, 35%)"
-          fadeDistance={12}
-          fadeStrength={1}
-          infiniteGrid
-        />
+        <Grid args={[10, 10]} cellSize={0.25} cellThickness={0.5} cellColor="hsl(215, 20%, 25%)"
+          sectionSize={1} sectionThickness={1} sectionColor="hsl(215, 25%, 35%)" fadeDistance={12} fadeStrength={1} infiniteGrid />
       )}
 
       <Suspense fallback={null}>
@@ -205,32 +188,17 @@ function SailRigScene({
           rigging={rigging}
           showWireframe={showWireframe}
           boomAngle={boomRad}
-          rudderAngle={0}
           windAngle={windAngle}
           windStrength={windStrength}
-          highlightTarget={selectedObj ? selectionKey(selectedObj) : null}
+          highlightTarget={highlightTarget(selectedObj, rigging)}
           onObjectClick={onObjectClick}
         />
-
         <HardpointMarkers rigging={rigging} boomRad={boomRad} visible={showHardpoints} />
         {showWindArrows && <WindArrow windAngle={windAngle} windStrength={windStrength} />}
-
-        <TransformGizmo
-          position={gizmoPos ?? [0, 0, 0]}
-          onDrag={onGizmoDrag}
-          visible={Boolean(gizmoPos)}
-          onDraggingChange={setIsDragging}
-        />
+        <TransformGizmo position={gizmoPos ?? [0, 0, 0]} onDrag={onGizmoDrag} visible={Boolean(gizmoPos)} onDraggingChange={setIsDragging} />
       </Suspense>
 
-      <OrbitControls
-        enabled={!isDragging}
-        enableDamping
-        dampingFactor={0.05}
-        minDistance={0.5}
-        maxDistance={30}
-        target={cameraTarget}
-      />
+      <OrbitControls enabled={!isDragging} enableDamping dampingFactor={0.05} minDistance={0.5} maxDistance={30} target={cameraTarget} />
       <GizmoHelper alignment="bottom-right" margin={[60, 60]}>
         <GizmoViewport axisColors={["#ef4444", "#22c55e", "#3b82f6"]} labelColor="white" />
       </GizmoHelper>
@@ -239,7 +207,7 @@ function SailRigScene({
 }
 
 const SailRig = () => {
-  const [rigging, setRigging] = useState<LaserRiggingParams>(() => ({ ...DEFAULT_LASER_RIGGING }));
+  const [rigging, setRigging] = useState<LaserRiggingParams>(loadSavedRigging);
   const [boomAngle, setBoomAngle] = useState(0);
   const [windAngle, setWindAngle] = useState(0.3);
   const [windStrength, setWindStrength] = useState(0.5);
@@ -251,18 +219,20 @@ const SailRig = () => {
 
   const boomRad = useMemo(() => (boomAngle / 180) * Math.PI, [boomAngle]);
   const cameraTarget = useMemo(() => new THREE.Vector3(0, 2.5, 0), []);
-  const activeKey = selectionKey(selectedObj);
 
-  const [sections, setSections] = useState({
-    wind: true,
-    tensions: true,
-    objects: true,
-    display: false,
-  });
-
+  const [sections, setSections] = useState({ wind: true, tensions: true, display: false });
   const toggle = (s: keyof typeof sections) => setSections((p) => ({ ...p, [s]: !p[s] }));
 
+  // Persist rigging to localStorage
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      localStorage.setItem(STORAGE_KEY, serializeRigging(rigging));
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [rigging]);
+
   const handleReset = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
     setRigging({ ...DEFAULT_LASER_RIGGING });
     setBoomAngle(0);
     setWindAngle(0.3);
@@ -270,51 +240,40 @@ const SailRig = () => {
     setSelectedObj(null);
   }, []);
 
+  // Position updaters
   const updateMastPos = useCallback((x: number, y: number, z: number) => {
     setRigging((r) => ({ ...r, mast: { ...r.mast, position: new THREE.Vector3(x, y, z) } }));
   }, []);
-
   const updateBoomPos = useCallback((x: number, y: number, z: number) => {
     setRigging((r) => ({ ...r, boom: { ...r.boom, position: new THREE.Vector3(x, y, z) } }));
   }, []);
-
   const updateTravelerPos = useCallback((x: number, y: number, z: number) => {
     setRigging((r) => ({
-      ...r,
-      traveler: { ...r.traveler, x, y, carZ: z },
-      pulleys: r.pulleys.map((p) =>
-        p.id === "mainsheet_traveler" ? { ...p, position: new THREE.Vector3(x, y, z) } : p
-      ),
+      ...r, traveler: { ...r.traveler, x, y, carZ: z },
+      pulleys: r.pulleys.map((p) => p.id === "mainsheet_traveler" ? { ...p, position: new THREE.Vector3(x, y, z) } : p),
     }));
   }, []);
-
   const updateHardpointWorld = useCallback((index: number, x: number, y: number, z: number) => {
     setRigging((r) => {
       const hardpoints = [...r.hardpoints];
       const current = hardpoints[index];
       if (!current) return r;
-
-      const local = fromWorldToAttach(new THREE.Vector3(x, y, z), current.attach, r, boomRad);
-      hardpoints[index] = { ...current, position: local };
+      hardpoints[index] = { ...current, position: fromWorldToAttach(new THREE.Vector3(x, y, z), current.attach, r, boomRad) };
       return { ...r, hardpoints };
     });
   }, [boomRad]);
-
   const updatePulleyWorld = useCallback((index: number, x: number, y: number, z: number) => {
     setRigging((r) => {
       const pulleys = [...r.pulleys];
       const current = pulleys[index];
       if (!current) return r;
-
-      const local = fromWorldToAttach(new THREE.Vector3(x, y, z), current.attach, r, boomRad);
-      pulleys[index] = { ...current, position: local };
+      pulleys[index] = { ...current, position: fromWorldToAttach(new THREE.Vector3(x, y, z), current.attach, r, boomRad) };
       return { ...r, pulleys };
     });
   }, [boomRad]);
 
   const onGizmoDrag = useCallback((x: number, y: number, z: number) => {
     if (!selectedObj) return;
-
     if (selectedObj.type === "mast") return updateMastPos(x, y, z);
     if (selectedObj.type === "boom") return updateBoomPos(x, y, z);
     if (selectedObj.type === "traveler") return updateTravelerPos(x, y, z);
@@ -324,15 +283,47 @@ const SailRig = () => {
 
   const handleSceneClick = useCallback((target: { type: string; index?: number }) => {
     const asSelection: ObjectSelection = target.index !== undefined
-      ? { type: target.type as "hardpoint" | "pulley", index: target.index }
-      : { type: target.type as "mast" | "boom" | "traveler" };
-
-    // Toggle: click same object again to deselect
-    setSelectedObj((prev) => {
-      if (selectionKey(prev) === selectionKey(asSelection)) return null;
-      return asSelection;
-    });
+      ? { type: target.type as "hardpoint" | "pulley" | "rope", index: target.index }
+      : { type: target.type as "mast" | "boom" | "sail" | "traveler" };
+    setSelectedObj((prev) => (selectionKey(prev) === selectionKey(asSelection) ? null : asSelection));
   }, []);
+
+  const handleDrawerUpdatePosition = useCallback((x: number, y: number, z: number) => {
+    if (!selectedObj) return;
+    if (selectedObj.type === "mast") updateMastPos(x, y, z);
+    else if (selectedObj.type === "boom") updateBoomPos(x, y, z);
+    else if (selectedObj.type === "traveler") updateTravelerPos(x, y, z);
+    else if (selectedObj.type === "hardpoint") updateHardpointWorld(selectedObj.index, x, y, z);
+    else if (selectedObj.type === "pulley") updatePulleyWorld(selectedObj.index, x, y, z);
+  }, [selectedObj, updateMastPos, updateBoomPos, updateTravelerPos, updateHardpointWorld, updatePulleyWorld]);
+
+  const handleUpdateSail = useCallback((patch: Partial<LaserRiggingParams["sail"]>) => {
+    setRigging((r) => ({ ...r, sail: { ...r.sail, ...patch } }));
+  }, []);
+
+  const handleUpdateRigging = useCallback((patch: Partial<LaserRiggingParams>) => {
+    setRigging((r) => ({ ...r, ...patch }));
+  }, []);
+
+  // Find related object by ID and select it
+  const handleSelectRelated = useCallback((id: string) => {
+    // Check if it's a known top-level
+    if (id === "mast") { setSelectedObj({ type: "mast" }); return; }
+    if (id === "boom") { setSelectedObj({ type: "boom" }); return; }
+    if (id === "sail") { setSelectedObj({ type: "sail" }); return; }
+    if (id === "traveler") { setSelectedObj({ type: "traveler" }); return; }
+    // Check pulleys
+    const pi = rigging.pulleys.findIndex((p) => p.id === id);
+    if (pi >= 0) { setSelectedObj({ type: "pulley", index: pi }); return; }
+    // Check ropes
+    const ri = rigging.ropes.findIndex((r) => r.id === id);
+    if (ri >= 0) { setSelectedObj({ type: "rope", index: ri }); return; }
+    // Check hardpoints
+    const hi = rigging.hardpoints.findIndex((h) => h.id === id);
+    if (hi >= 0) { setSelectedObj({ type: "hardpoint", index: hi }); return; }
+  }, [rigging]);
+
+  const worldPos = getSelectedWorldPos(rigging, selectedObj, boomRad);
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
@@ -350,39 +341,26 @@ const SailRig = () => {
             </div>
             <div>
               <h1 className="text-sm font-bold font-mono">Sail Rig Integration</h1>
-              <p className="text-[10px] text-muted-foreground">World coordinates: type XYZ or drag gizmo</p>
+              <p className="text-[10px] text-muted-foreground">Click any object in 3D to inspect & edit</p>
             </div>
           </div>
         </div>
-        <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleReset}>
-          Reset
-        </Button>
+        <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleReset}>Reset All</Button>
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-80 border-r border-border overflow-y-auto scrollbar-hide bg-card p-3 space-y-2 flex-shrink-0">
+        {/* Left sidebar — Wind, Tensions, Display only */}
+        <div className="w-72 border-r border-border overflow-y-auto scrollbar-hide bg-card p-3 space-y-2 flex-shrink-0">
           <Collapsible open={sections.display}>
             <CollapsibleTrigger onClick={() => toggle("display")} className="flex items-center justify-between w-full py-1.5 text-xs font-semibold">
               <span className="flex items-center gap-1.5"><Eye className="w-3 h-3" /> Display</span>
               <ChevronDown className={`w-3 h-3 transition-transform ${sections.display ? "rotate-180" : ""}`} />
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-2 pt-2">
-              <div className="flex items-center gap-2">
-                <Switch checked={showWireframe} onCheckedChange={setShowWireframe} className="scale-75" />
-                <Label className="text-xs">Wireframe</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={showWindArrows} onCheckedChange={setShowWindArrows} className="scale-75" />
-                <Label className="text-xs">Wind Arrows</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={showGrid} onCheckedChange={setShowGrid} className="scale-75" />
-                <Label className="text-xs">Ground Grid</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={showHardpoints} onCheckedChange={setShowHardpoints} className="scale-75" />
-                <Label className="text-xs">Hardpoint Markers</Label>
-              </div>
+              <div className="flex items-center gap-2"><Switch checked={showWireframe} onCheckedChange={setShowWireframe} className="scale-75" /><Label className="text-xs">Wireframe</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={showWindArrows} onCheckedChange={setShowWindArrows} className="scale-75" /><Label className="text-xs">Wind Arrows</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={showGrid} onCheckedChange={setShowGrid} className="scale-75" /><Label className="text-xs">Ground Grid</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={showHardpoints} onCheckedChange={setShowHardpoints} className="scale-75" /><Label className="text-xs">Hardpoint Markers</Label></div>
             </CollapsibleContent>
           </Collapsible>
 
@@ -412,145 +390,32 @@ const SailRig = () => {
               <S label="Outhaul" value={rigging.outhaulTension} min={0} max={1} step={0.01} onChange={(v) => setRigging((r) => ({ ...r, outhaulTension: v }))} />
             </CollapsibleContent>
           </Collapsible>
-
-          <Separator />
-
-          <Collapsible open={sections.objects}>
-            <CollapsibleTrigger onClick={() => toggle("objects")} className="flex items-center justify-between w-full py-1.5 text-xs font-semibold">
-              <span className="flex items-center gap-1.5"><Crosshair className="w-3 h-3" /> Objects (World XYZ)</span>
-              <ChevronDown className={`w-3 h-3 transition-transform ${sections.objects ? "rotate-180" : ""}`} />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-1.5 pt-2">
-              <CoordinateInput
-                label="🏗️ Mast"
-                x={rigging.mast.position.x}
-                y={rigging.mast.position.y}
-                z={rigging.mast.position.z}
-                onChange={updateMastPos}
-                selected={activeKey === "mast"}
-                onSelect={() => setSelectedObj(activeKey === "mast" ? null : { type: "mast" })}
-              />
-
-              <CoordinateInput
-                label="🏗️ Boom"
-                x={rigging.boom.position.x}
-                y={rigging.boom.position.y}
-                z={rigging.boom.position.z}
-                onChange={updateBoomPos}
-                selected={activeKey === "boom"}
-                onSelect={() => setSelectedObj(activeKey === "boom" ? null : { type: "boom" })}
-              />
-
-              <CoordinateInput
-                label="🪢 Traveler (X, Y, Car Z)"
-                x={rigging.traveler.x}
-                y={rigging.traveler.y}
-                z={rigging.traveler.carZ}
-                onChange={updateTravelerPos}
-                selected={activeKey === "traveler"}
-                onSelect={() => setSelectedObj(activeKey === "traveler" ? null : { type: "traveler" })}
-              />
-
-              <div className="pl-2 pb-1">
-                <div className="flex items-center gap-2">
-                  <Label className="text-[9px] text-muted-foreground">Track Half-Span</Label>
-                  <input
-                    type="number"
-                    step={0.01}
-                    value={rigging.traveler.trackHalfSpan}
-                    onChange={(e) => {
-                      const v = parseFloat(e.target.value);
-                      if (!Number.isNaN(v)) setRigging((r) => ({ ...r, traveler: { ...r.traveler, trackHalfSpan: v } }));
-                    }}
-                    className="w-20 h-5 px-1 text-[10px] font-mono bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              <Separator className="my-1" />
-
-              <Label className="text-[9px] text-muted-foreground uppercase tracking-wide block pt-1">Pulleys / Blocks</Label>
-              {rigging.pulleys.map((pulley, i) => {
-                const world = toWorldFromAttach(pulley.position, pulley.attach, rigging, boomRad);
-                const key = `pulley-${i}`;
-
-                return (
-                  <div key={pulley.id} className="space-y-1">
-                    <CoordinateInput
-                      label={`🔩 ${pulley.id} (${pulley.attach})`}
-                      x={world.x}
-                      y={world.y}
-                      z={world.z}
-                      onChange={(x, y, z) => updatePulleyWorld(i, x, y, z)}
-                      selected={activeKey === key}
-                      onSelect={() => setSelectedObj(activeKey === key ? null : { type: "pulley", index: i })}
-                    />
-                    <div className="pl-2 flex items-center gap-2">
-                      <Label className="text-[9px] text-muted-foreground">Attach</Label>
-                      <select
-                        value={pulley.attach}
-                        onChange={(e) => {
-                          const attach = e.target.value as PulleyParams["attach"];
-                          setRigging((r) => {
-                            const pulleys = [...r.pulleys];
-                            pulleys[i] = { ...pulleys[i], attach };
-                            return { ...r, pulleys };
-                          });
-                        }}
-                        className="h-6 px-1 text-[10px] bg-background border border-border rounded text-foreground"
-                      >
-                        <option value="hull">Hull</option>
-                        <option value="boom">Boom</option>
-                        <option value="mast">Mast</option>
-                      </select>
-                    </div>
-                  </div>
-                );
-              })}
-
-              <Separator className="my-1" />
-
-              <Label className="text-[9px] text-muted-foreground uppercase tracking-wide block pt-1">Hardpoints</Label>
-              {rigging.hardpoints.map((hp, i) => {
-                const world = toWorldFromAttach(hp.position, hp.attach, rigging, boomRad);
-                const key = `hardpoint-${i}`;
-
-                return (
-                  <CoordinateInput
-                    key={hp.id}
-                    label={`📍 ${hp.label || hp.id} (${hp.attach})`}
-                    x={world.x}
-                    y={world.y}
-                    z={world.z}
-                    onChange={(x, y, z) => updateHardpointWorld(i, x, y, z)}
-                    selected={activeKey === key}
-                    onSelect={() => setSelectedObj(activeKey === key ? null : { type: "hardpoint", index: i })}
-                  />
-                );
-              })}
-            </CollapsibleContent>
-          </Collapsible>
         </div>
 
+        {/* 3D Viewport */}
         <div className="flex-1">
           <Canvas shadows gl={{ antialias: true, preserveDrawingBuffer: true }} style={{ background: "hsl(222, 47%, 8%)" }}>
             <SailRigScene
-              rigging={rigging}
-              boomAngle={boomAngle}
-              windAngle={windAngle}
-              windStrength={windStrength}
-              showWireframe={showWireframe}
-              showWindArrows={showWindArrows}
-              showGrid={showGrid}
-              showHardpoints={showHardpoints}
-              selectedObj={selectedObj}
-              onGizmoDrag={onGizmoDrag}
-              onObjectClick={handleSceneClick}
-              cameraTarget={cameraTarget}
+              rigging={rigging} boomAngle={boomAngle} windAngle={windAngle} windStrength={windStrength}
+              showWireframe={showWireframe} showWindArrows={showWindArrows} showGrid={showGrid} showHardpoints={showHardpoints}
+              selectedObj={selectedObj} onGizmoDrag={onGizmoDrag} onObjectClick={handleSceneClick} cameraTarget={cameraTarget}
             />
           </Canvas>
         </div>
       </div>
+
+      {/* Right Detail Drawer */}
+      <ObjectDetailDrawer
+        selection={selectedObj}
+        rigging={rigging}
+        boomRad={boomRad}
+        onClose={() => setSelectedObj(null)}
+        onSelectRelated={handleSelectRelated}
+        onUpdatePosition={handleDrawerUpdatePosition}
+        worldPosition={worldPos}
+        onUpdateSail={handleUpdateSail}
+        onUpdateRigging={handleUpdateRigging}
+      />
     </div>
   );
 };
