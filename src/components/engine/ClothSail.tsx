@@ -13,6 +13,7 @@ interface ClothSailProps {
   windStrength: number;
   showWireframe?: boolean;
   highlight?: boolean;
+  onClick?: () => void;
 }
 
 interface ClothPoint {
@@ -44,7 +45,8 @@ export function ClothSail({
   windAngle,
   windStrength,
   showWireframe = false,
-  highlight = false
+  highlight = false,
+  onClick,
 }: ClothSailProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
@@ -435,8 +437,9 @@ export function ClothSail({
 
     const pts = pointsRef.current;
     const dt = Math.min(delta, 0.016);
-    const gravity = new THREE.Vector3(0, -0.5, 0);
-    const damping = 0.97;
+    const gravity = new THREE.Vector3(0, -(rigging.sail.gravity ?? 0.5), 0);
+    const damping = rigging.sail.damping ?? 0.97;
+    const iterations = rigging.sail.constraintIterations ?? 5;
 
     // Wind force
     const apparentWindAngle = windAngle - boomAngle;
@@ -488,8 +491,8 @@ export function ClothSail({
     });
 
     // Satisfy constraints
-    const iterations = 5;
-    for (let iter = 0; iter < iterations; iter++) {
+    const constraintIterations = iterations;
+    for (let iter = 0; iter < constraintIterations; iter++) {
       constraints.forEach((c) => {
         const p1 = pts[c.p1];
         const p2 = pts[c.p2];
@@ -502,6 +505,43 @@ export function ClothSail({
         if (!p1.fixed) p1.position.add(correction);
         if (!p2.fixed) p2.position.sub(correction);
       });
+    }
+
+    // Self-collision pass (spatial hash)
+    if (rigging.sail.collisionEnabled) {
+      const threshold = rigging.sail.collisionThreshold ?? 0.015;
+      const thresholdSq = threshold * threshold;
+      // Simple O(n²) collision for moderate mesh sizes
+      for (let a = 0; a < pts.length; a++) {
+        if (pts[a].fixed) continue;
+        for (let b = a + 2; b < pts.length; b++) {
+          if (pts[b].fixed) continue;
+          // Skip adjacent particles (within 2 indices in same row or column)
+          const rowA = Math.floor(a / (segW + 1));
+          const colA = a % (segW + 1);
+          const rowB = Math.floor(b / (segW + 1));
+          const colB = b % (segW + 1);
+          if (Math.abs(rowA - rowB) <= 1 && Math.abs(colA - colB) <= 1) continue;
+
+          const dx = pts[b].position.x - pts[a].position.x;
+          const dy = pts[b].position.y - pts[a].position.y;
+          const dz = pts[b].position.z - pts[a].position.z;
+          const distSq = dx * dx + dy * dy + dz * dz;
+          if (distSq < thresholdSq && distSq > 1e-10) {
+            const dist = Math.sqrt(distSq);
+            const overlap = (threshold - dist) * 0.5;
+            const nx = dx / dist * overlap;
+            const ny = dy / dist * overlap;
+            const nz = dz / dist * overlap;
+            pts[a].position.x -= nx;
+            pts[a].position.y -= ny;
+            pts[a].position.z -= nz;
+            pts[b].position.x += nx;
+            pts[b].position.y += ny;
+            pts[b].position.z += nz;
+          }
+        }
+      }
     }
 
     // Update geometry
@@ -572,7 +612,7 @@ export function ClothSail({
       position={[gooseneckPosition.x, gooseneckPosition.y, gooseneckPosition.z]}
       rotation={[0, boomAngle, 0]}
     >
-      <mesh ref={meshRef} geometry={geometry}>
+      <mesh ref={meshRef} geometry={geometry} onClick={(e) => { e.stopPropagation(); onClick?.(); }}>
         <meshStandardMaterial
           color={rigging.sail.color}
           roughness={0.85}

@@ -134,7 +134,6 @@ export function BoatGroupV2({
           rigging={rigging}
           showWireframe={showWireframe}
           boomAngle={boomAngle}
-          rudderAngle={rudderAngle}
           windAngle={windAngle}
           windStrength={windStrength}
           highlightTarget={highlightTarget}

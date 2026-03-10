@@ -62,6 +62,12 @@ export interface SailParams {
   clothSegmentsHeight: number; // ~24
   color: string;
   opacity: number;
+  // Physics params
+  damping: number;             // Velocity damping: 0.85..1
+  gravity: number;             // Gravity multiplier: 0..2
+  constraintIterations: number;// Solver iterations: 1..20
+  collisionEnabled: boolean;   // Self-collision toggle
+  collisionThreshold: number;  // Min particle separation in meters
 }
 
 // ===== CENTERBOARD PARAMETERS =====
@@ -302,7 +308,12 @@ export const DEFAULT_LASER_RIGGING: LaserRiggingParams = {
     clothSegmentsWidth: 18,
     clothSegmentsHeight: 24,
     color: "#f8f8ff",
-    opacity: 0.92
+    opacity: 0.92,
+    damping: 0.97,
+    gravity: 0.5,
+    constraintIterations: 5,
+    collisionEnabled: false,
+    collisionThreshold: 0.015
   },
   centerboard: {
     chord: 0.25,
