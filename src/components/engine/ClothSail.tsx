@@ -437,8 +437,9 @@ export function ClothSail({
 
     const pts = pointsRef.current;
     const dt = Math.min(delta, 0.016);
-    const gravity = new THREE.Vector3(0, -0.5, 0);
-    const damping = 0.97;
+    const gravity = new THREE.Vector3(0, -(rigging.sail.gravity ?? 0.5), 0);
+    const damping = rigging.sail.damping ?? 0.97;
+    const iterations = rigging.sail.constraintIterations ?? 5;
 
     // Wind force
     const apparentWindAngle = windAngle - boomAngle;
