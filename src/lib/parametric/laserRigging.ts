@@ -62,6 +62,12 @@ export interface SailParams {
   clothSegmentsHeight: number; // ~24
   color: string;
   opacity: number;
+  // Physics params
+  damping: number;             // Velocity damping: 0.85..1
+  gravity: number;             // Gravity multiplier: 0..2
+  constraintIterations: number;// Solver iterations: 1..20
+  collisionEnabled: boolean;   // Self-collision toggle
+  collisionThreshold: number;  // Min particle separation in meters
 }
 
 // ===== CENTERBOARD PARAMETERS =====
