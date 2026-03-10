@@ -612,7 +612,7 @@ export function ClothSail({
       position={[gooseneckPosition.x, gooseneckPosition.y, gooseneckPosition.z]}
       rotation={[0, boomAngle, 0]}
     >
-      <mesh ref={meshRef} geometry={geometry}>
+      <mesh ref={meshRef} geometry={geometry} onClick={(e) => { e.stopPropagation(); onClick?.(); }}>
         <meshStandardMaterial
           color={rigging.sail.color}
           roughness={0.85}
