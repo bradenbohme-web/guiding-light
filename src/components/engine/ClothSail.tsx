@@ -1,6 +1,8 @@
 // Cloth-simulated Sail with wind and tension response
 // Battens are on the LEECH (outer free edge), not the luff
 // Window and battens follow the cloth simulation
+// CORRECT LASER SAIL: Only luff is attached to mast. Foot is FREE (not attached to boom).
+// Clew is connected to boom end via outhaul rope. Sail comes to a true triangular peak.
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -24,8 +26,8 @@ interface ClothPoint {
   mass: number;
   u: number;
   v: number;
-  battenStiffness: number; // Extra stiffness from battens
-  windowStiffness: number; // Extra stiffness from the vinyl window panel region
+  battenStiffness: number;
+  windowStiffness: number;
 }
 
 interface ClothConstraint {
@@ -35,10 +37,8 @@ interface ClothConstraint {
   stiffness: number;
 }
 
-// Helper to get point index from grid coordinates
 const getIdx = (i: number, j: number, segW: number) => j * (segW + 1) + i;
 
-// Cloth simulation for realistic sail deformation
 export function ClothSail({
   rigging,
   boomAngle,
@@ -63,27 +63,24 @@ export function ClothSail({
     const pts: ClothPoint[] = [];
     const constrs: ClothConstraint[] = [];
     const inds: number[] = [];
-    const battenPtIndices: number[][] = []; // For each batten, store point indices along it
-    const windowPtIndices: number[] = []; // Points that make up the window area
+    const battenPtIndices: number[][] = [];
+    const windowPtIndices: number[] = [];
 
-    // Batten positions (v = vertical position on sail, u=1 is leech)
     const battenPositions = rigging.sail.battens.positions;
     const battenLengths = rigging.sail.battens.lengths;
 
-    // Snap each batten to exactly one cloth row to prevent cross-row zigzag constraints
     const battenRows = rigging.sail.battens.enabled
       ? battenPositions.map((battenV, bi) => {
           const row = THREE.MathUtils.clamp(Math.round(battenV * segH), 0, segH);
           const rowV = row / segH;
-          const widthAtRow = footLength * (1 - rowV * 0.95);
+          // Use true triangle width calculation
+          const widthAtRow = footLength * (1 - rowV);
           const battenLen = Math.max(0, battenLengths[bi] || 0.5);
           const battenUStart = Math.max(0, 1 - battenLen / Math.max(widthAtRow, 1e-6));
-
           return { row, battenUStart };
         })
       : [];
     
-    // Window UV position
     const windowU = rigging.sail.window.position.u;
     const windowV = rigging.sail.window.position.v;
     const windowHalfW = rigging.sail.window.size.width / footLength / 2;
@@ -92,42 +89,38 @@ export function ClothSail({
     // Create grid of points for sail
     for (let j = 0; j <= segH; j++) {
       for (let i = 0; i <= segW; i++) {
-        const u = i / segW; // 0 to 1 along foot (0=luff/mast, 1=leech)
-        const v = j / segH; // 0 to 1 along luff (0=foot/boom, 1=head)
+        const u = i / segW; // 0=luff/mast, 1=leech
+        const v = j / segH; // 0=foot/tack, 1=head
 
-        // Sail shape: triangular with head narrower than foot
-        const widthAtHeight = footLength * (1 - v * 0.95);
+        // TRUE TRIANGLE: width goes to 0 at the head (v=1)
+        const widthAtHeight = footLength * (1 - v);
         const x = -u * widthAtHeight;
         const y = v * luffLength;
         const z = 0;
 
-        // Points along luff (u=0) are fixed to mast
-        // Points along foot (v=0) are fixed to boom
+        // CORRECT LASER ATTACHMENT:
+        // Only the LUFF (u=0) is fixed to the mast (sail sleeve)
+        // The FOOT is completely FREE — not attached to the boom
+        // The tack (u=0, v=0) is fixed (bottom of luff at gooseneck)
+        // The head (u=0, v=1) is fixed (top of mast)
         const isLuff = i === 0;
-        const isFoot = j === 0;
-        const isFixed = isLuff || isFoot;
+        const isFixed = isLuff;
 
-        // Calculate batten stiffness for this point
-        // Battens are on the LEECH edge (u close to 1), pinned to one row each
+        // Calculate batten stiffness
         let battenStiffness = 0;
         if (rigging.sail.battens.enabled) {
           for (let bi = 0; bi < battenRows.length; bi++) {
             const { row, battenUStart } = battenRows[bi];
-            // Per-batten stiffness: use stiffnesses[] if available, fallback to global
             const perBattenStiff = rigging.sail.battens.stiffnesses?.[bi] ?? rigging.sail.battens.stiffness;
-
-            // Single-row membership prevents zigzagging across adjacent rows
             if (j === row && u >= battenUStart) {
               battenStiffness = Math.max(battenStiffness, perBattenStiff * 2);
-
-              // Track batten points in row order for stable constraints
               if (!battenPtIndices[bi]) battenPtIndices[bi] = [];
               battenPtIndices[bi].push(j * (segW + 1) + i);
             }
           }
         }
 
-        // Window stiffness + tracking
+        // Window stiffness
         let windowStiffness = 0;
         if (
           rigging.sail.window.enabled &&
@@ -135,7 +128,6 @@ export function ClothSail({
           Math.abs(v - windowV) < windowHalfH
         ) {
           windowPtIndices.push(j * (segW + 1) + i);
-          // Vinyl panel behaves like a stiffer laminate area
           windowStiffness = 0.9;
         }
 
@@ -162,194 +154,116 @@ export function ClothSail({
         if (i < segW) {
           const p1 = idx;
           const p2 = getIdx(i + 1, j, segW);
-          // Higher stiffness along battens / window
           const stiffBoost = Math.max(
-            pts[p1].battenStiffness,
-            pts[p2].battenStiffness,
-            pts[p1].windowStiffness,
-            pts[p2].windowStiffness
+            pts[p1].battenStiffness, pts[p2].battenStiffness,
+            pts[p1].windowStiffness, pts[p2].windowStiffness
           );
-          constrs.push({
-            p1,
-            p2,
-            restLength: pts[p1].position.distanceTo(pts[p2].position),
-            stiffness: 0.95 + stiffBoost * 0.04,
-          });
+          constrs.push({ p1, p2, restLength: pts[p1].position.distanceTo(pts[p2].position), stiffness: 0.95 + stiffBoost * 0.04 });
         }
 
         // Structural vertical
         if (j < segH) {
           const p1 = idx;
           const p2 = getIdx(i, j + 1, segW);
-          const stiffBoost = Math.max(
-            pts[p1].windowStiffness,
-            pts[p2].windowStiffness
-          );
-          constrs.push({
-            p1,
-            p2,
-            restLength: pts[p1].position.distanceTo(pts[p2].position),
-            stiffness: 0.95 + stiffBoost * 0.03,
-          });
+          const stiffBoost = Math.max(pts[p1].windowStiffness, pts[p2].windowStiffness);
+          constrs.push({ p1, p2, restLength: pts[p1].position.distanceTo(pts[p2].position), stiffness: 0.95 + stiffBoost * 0.03 });
         }
 
         // Shear diagonals
         if (i < segW && j < segH) {
-          const p1 = idx;
-          const p2 = getIdx(i + 1, j + 1, segW);
-          constrs.push({
-            p1,
-            p2,
-            restLength: pts[p1].position.distanceTo(pts[p2].position),
-            stiffness: 0.8,
-          });
+          constrs.push({ p1: idx, p2: getIdx(i + 1, j + 1, segW), restLength: pts[idx].position.distanceTo(pts[getIdx(i + 1, j + 1, segW)].position), stiffness: 0.8 });
         }
         if (i > 0 && j < segH) {
-          const p1 = idx;
-          const p2 = getIdx(i - 1, j + 1, segW);
-          constrs.push({
-            p1,
-            p2,
-            restLength: pts[p1].position.distanceTo(pts[p2].position),
-            stiffness: 0.8,
-          });
+          constrs.push({ p1: idx, p2: getIdx(i - 1, j + 1, segW), restLength: pts[idx].position.distanceTo(pts[getIdx(i - 1, j + 1, segW)].position), stiffness: 0.8 });
         }
 
-        // Bending resistance (2-step constraints). This is what stops cloth
-        // from folding too sharply and is crucial for "batten rigidity".
+        // Bending resistance (2-step)
         if (i < segW - 1) {
-          const p1 = idx;
           const p2 = getIdx(i + 2, j, segW);
-          const stiffBoost = Math.max(
-            pts[p1].battenStiffness,
-            pts[p2].battenStiffness,
-            pts[p1].windowStiffness,
-            pts[p2].windowStiffness
-          );
-          constrs.push({
-            p1,
-            p2,
-            restLength: pts[p1].position.distanceTo(pts[p2].position),
-            stiffness: 0.18 + stiffBoost * 0.25,
-          });
+          const stiffBoost = Math.max(pts[idx].battenStiffness, pts[p2].battenStiffness, pts[idx].windowStiffness, pts[p2].windowStiffness);
+          constrs.push({ p1: idx, p2, restLength: pts[idx].position.distanceTo(pts[p2].position), stiffness: 0.18 + stiffBoost * 0.25 });
         }
         if (j < segH - 1) {
-          const p1 = idx;
           const p2 = getIdx(i, j + 2, segW);
-          const stiffBoost = Math.max(
-            pts[p1].windowStiffness,
-            pts[p2].windowStiffness
-          );
-          constrs.push({
-            p1,
-            p2,
-            restLength: pts[p1].position.distanceTo(pts[p2].position),
-            stiffness: 0.18 + stiffBoost * 0.25,
-          });
+          const stiffBoost = Math.max(pts[idx].windowStiffness, pts[p2].windowStiffness);
+          constrs.push({ p1: idx, p2, restLength: pts[idx].position.distanceTo(pts[p2].position), stiffness: 0.18 + stiffBoost * 0.25 });
         }
       }
     }
 
-    // Explicit batten constraints (strong rib lines)
-    // These are additional to the grid constraints and greatly reduce bending
-    // right where battens are attached.
+    // Explicit batten constraints
     if (rigging.sail.battens.enabled) {
       battenPtIndices.forEach((battenPts, bi) => {
         if (!battenPts || battenPts.length < 3) return;
-
-        // Per-batten stiffness with fallback
         const rawStiff = rigging.sail.battens.stiffnesses?.[bi] ?? rigging.sail.battens.stiffness ?? 0.8;
         const k = 0.45 + rawStiff * 0.3;
-
         for (let ii = 0; ii < battenPts.length - 1; ii++) {
-          const p1 = battenPts[ii];
-          const p2 = battenPts[ii + 1];
-          constrs.push({
-            p1,
-            p2,
-            restLength: pts[p1].position.distanceTo(pts[p2].position),
-            stiffness: k,
-          });
+          constrs.push({ p1: battenPts[ii], p2: battenPts[ii + 1], restLength: pts[battenPts[ii]].position.distanceTo(pts[battenPts[ii + 1]].position), stiffness: k });
         }
-
-        // Extra bending resistance along the batten (skip-one)
         for (let ii = 0; ii < battenPts.length - 2; ii++) {
-          const p1 = battenPts[ii];
-          const p2 = battenPts[ii + 2];
-          constrs.push({
-            p1,
-            p2,
-            restLength: pts[p1].position.distanceTo(pts[p2].position),
-            stiffness: Math.min(0.95, k + 0.15),
-          });
+          constrs.push({ p1: battenPts[ii], p2: battenPts[ii + 2], restLength: pts[battenPts[ii]].position.distanceTo(pts[battenPts[ii + 2]].position), stiffness: Math.min(0.95, k + 0.15) });
         }
       });
     }
 
-    // Apply tension modifiers from rigging
+    // CLEW CONSTRAINT: The clew corner (u=1, v=0) is connected to the boom end via outhaul
+    // It's not fixed but constrained to the boom end with a spring based on outhaul tension
+    // The clew index is at i=segW, j=0
+    const clewIdx = getIdx(segW, 0, segW);
+    // Add a strong constraint from clew to the boom-end position (will be enforced in useFrame)
+
+    // Tension modifiers
     const cunninghamMod = 1 + rigging.cunninghamTension * 0.3;
     const outhaulMod = 1 + rigging.outhaulTension * 0.3;
 
     constrs.forEach((c) => {
       const p1 = pts[c.p1];
       const p2 = pts[c.p2];
-
-      // Near luff - cunningham
-      if (p1.u < 0.15 || p2.u < 0.15) {
-        c.stiffness *= cunninghamMod;
-      }
-
-      // Near foot - outhaul
-      if (p1.v < 0.1 || p2.v < 0.1) {
-        c.stiffness *= outhaulMod;
-      }
+      if (p1.u < 0.15 || p2.u < 0.15) c.stiffness *= cunninghamMod;
+      if (p1.v < 0.1 || p2.v < 0.1) c.stiffness *= outhaulMod;
     });
 
-    // Generate triangle indices
+    // Triangle indices
     for (let j = 0; j < segH; j++) {
       for (let i = 0; i < segW; i++) {
         const a = getIdx(i, j, segW);
         const b = getIdx(i + 1, j, segW);
         const c = getIdx(i, j + 1, segW);
         const d = getIdx(i + 1, j + 1, segW);
-
-        inds.push(a, b, c);
-        inds.push(b, d, c);
+        // Skip degenerate triangles at the top where width approaches 0
+        if (pts[a].position.distanceTo(pts[b].position) > 1e-4 && pts[c].position.distanceTo(pts[d].position) > 1e-4) {
+          inds.push(a, b, c);
+          inds.push(b, d, c);
+        } else if (pts[a].position.distanceTo(pts[c].position) > 1e-4) {
+          // Single triangle for the very tip
+          inds.push(a, b, c);
+        }
       }
     }
 
-    // Build a window patch mesh that reuses the *same* simulated cloth points
-    // (so it always matches curvature, no "floating" plane).
+    // Window mesh data
     const windowMeshData = (() => {
       if (!rigging.sail.window.enabled || windowPtIndices.length < 4) {
         return null as null | { vertexGlobal: number[]; indices: number[] };
       }
-
       const windowSet = new Set(windowPtIndices);
       const triGlobal: number[] = [];
-
-      // Collect triangles fully inside the window region
       for (let j = 0; j < segH; j++) {
         for (let i = 0; i < segW; i++) {
           const a = getIdx(i, j, segW);
           const b = getIdx(i + 1, j, segW);
           const c = getIdx(i, j + 1, segW);
           const d = getIdx(i + 1, j + 1, segW);
-
           if (windowSet.has(a) && windowSet.has(b) && windowSet.has(c) && windowSet.has(d)) {
             triGlobal.push(a, b, c);
             triGlobal.push(b, d, c);
           }
         }
       }
-
       if (triGlobal.length === 0) return null;
-
-      // Remap global indices -> local window-geometry indices
       const map = new Map<number, number>();
       const vertexGlobal: number[] = [];
       const indices: number[] = [];
-
       for (const g of triGlobal) {
         let local = map.get(g);
         if (local === undefined) {
@@ -359,74 +273,54 @@ export function ClothSail({
         }
         indices.push(local);
       }
-
       return { vertexGlobal, indices };
     })();
 
     pointsRef.current = pts;
 
-    return {
-      points: pts,
-      constraints: constrs,
-      indices: inds,
-      battenPointIndices: battenPtIndices,
-      windowPointIndices: windowPtIndices,
-      windowMeshData,
-    };
+    return { points: pts, constraints: constrs, indices: inds, battenPointIndices: battenPtIndices, windowPointIndices: windowPtIndices, windowMeshData };
   }, [luffLength, footLength, segW, segH, rigging.cunninghamTension, rigging.outhaulTension, rigging.sail.battens, rigging.sail.window]);
 
   // Create geometry
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry();
-
     const positions = new Float32Array(points.length * 3);
     const normals = new Float32Array(points.length * 3);
     const uvs = new Float32Array(points.length * 2);
-
     points.forEach((p, i) => {
       positions[i * 3] = p.position.x;
       positions[i * 3 + 1] = p.position.y;
       positions[i * 3 + 2] = p.position.z;
       normals[i * 3 + 2] = 1;
-      uvs[i *  2] = p.u;
+      uvs[i * 2] = p.u;
       uvs[i * 2 + 1] = p.v;
     });
-
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     geo.setIndex(indices);
-
     geometryRef.current = geo;
     return geo;
   }, [points, indices]);
 
-  // Window patch geometry (subset of the cloth mesh) so it always matches
-  // the sail's exact curvature + angle.
+  // Window geometry
   const windowGeometry = useMemo(() => {
-    if (!windowMeshData) {
-      windowGeometryRef.current = null;
-      return null;
-    }
-
+    if (!windowMeshData) { windowGeometryRef.current = null; return null; }
     const geo = new THREE.BufferGeometry();
     const positions = new Float32Array(windowMeshData.vertexGlobal.length * 3);
     const uvs = new Float32Array(windowMeshData.vertexGlobal.length * 2);
-
     windowMeshData.vertexGlobal.forEach((gIdx, i) => {
       const p = points[gIdx];
       positions[i * 3] = p.position.x;
       positions[i * 3 + 1] = p.position.y;
-      positions[i * 3 + 2] = p.position.z + 0.002; // tiny offset to avoid z-fighting
+      positions[i * 3 + 2] = p.position.z + 0.002;
       uvs[i * 2] = p.u;
       uvs[i * 2 + 1] = p.v;
     });
-
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     geo.setIndex(windowMeshData.indices);
     geo.computeVertexNormals();
-
     windowGeometryRef.current = geo;
     return geo;
   }, [points, windowMeshData]);
@@ -444,30 +338,23 @@ export function ClothSail({
     // Wind force
     const apparentWindAngle = windAngle - boomAngle;
     const windDir = new THREE.Vector3(
-      Math.sin(apparentWindAngle),
-      0,
-      Math.cos(apparentWindAngle)
+      Math.sin(apparentWindAngle), 0, Math.cos(apparentWindAngle)
     ).multiplyScalar(windStrength * 2);
 
-    // Apply forces to points
+    // Apply forces
     pts.forEach((p) => {
       if (p.fixed) return;
-
       p.acceleration.set(0, 0, 0);
       p.acceleration.add(gravity);
-
       const windForce = windDir.clone();
       const turbulence = (Math.sin(Date.now() * 0.003 + p.position.y * 2) * 0.15 + 1);
       windForce.multiplyScalar(turbulence / p.mass);
       p.acceleration.add(windForce);
 
-      // Vang effect - pulls leech down when tensioned
+      // Vang effect
       if (p.u > 0.7) {
-        const vangPull = new THREE.Vector3(0, -rigging.vangTension * 0.5, 0);
-        p.acceleration.add(vangPull);
+        p.acceleration.add(new THREE.Vector3(0, -rigging.vangTension * 0.5, 0));
       }
-      
-      // Batten stiffness reduces movement
       if (p.battenStiffness > 0) {
         p.acceleration.multiplyScalar(1 / (1 + p.battenStiffness * 0.5));
       }
@@ -476,53 +363,103 @@ export function ClothSail({
     // Verlet integration
     pts.forEach((p) => {
       if (p.fixed) return;
-
-      const newPos = p.position.clone()
-        .multiplyScalar(2)
-        .sub(p.prevPosition)
-        .add(p.acceleration.clone().multiplyScalar(dt * dt));
-
+      const newPos = p.position.clone().multiplyScalar(2).sub(p.prevPosition).add(p.acceleration.clone().multiplyScalar(dt * dt));
       p.prevPosition.copy(p.position);
       p.position.copy(newPos);
-
       const vel = p.position.clone().sub(p.prevPosition);
       vel.multiplyScalar(damping);
       p.prevPosition.copy(p.position.clone().sub(vel));
     });
 
     // Satisfy constraints
-    const constraintIterations = iterations;
-    for (let iter = 0; iter < constraintIterations; iter++) {
+    for (let iter = 0; iter < iterations; iter++) {
       constraints.forEach((c) => {
         const p1 = pts[c.p1];
         const p2 = pts[c.p2];
-
         const diff = p2.position.clone().sub(p1.position);
         const dist = diff.length();
         if (dist < 1e-6) return;
         const correction = diff.multiplyScalar((dist - c.restLength) / dist * c.stiffness * 0.5);
-
         if (!p1.fixed) p1.position.add(correction);
         if (!p2.fixed) p2.position.sub(correction);
       });
+
+      // CLEW CONSTRAINT: Pull clew toward boom end based on outhaul tension
+      // Clew is at i=segW, j=0
+      const clewIdx = getIdx(segW, 0, segW);
+      const clew = pts[clewIdx];
+      if (!clew.fixed) {
+        // Boom end position in local sail space (sail is positioned at gooseneck and rotated by boomAngle)
+        // In local space, boom end is at (-boomLength, 0, 0) since boom extends in -X
+        const boomEndLocal = new THREE.Vector3(-rigging.boom.length, 0, 0);
+        const diff = boomEndLocal.clone().sub(clew.position);
+        const dist = diff.length();
+        if (dist > 0.01) {
+          // Outhaul tension determines how tightly the clew is pulled to the boom end
+          const outhaulStiffness = 0.3 + rigging.outhaulTension * 0.65;
+          const correction = diff.multiplyScalar(outhaulStiffness * 0.3);
+          clew.position.add(correction);
+        }
+      }
     }
 
-    // Self-collision pass (spatial hash)
+    // MAST/BOOM COLLISION: Prevent sail from passing through the mast cylinder and boom
+    // Mast is a cylinder along Y axis at local position (0, 0, 0) relative to gooseneck
+    // Actually the mast is at the luff edge, and the sail is positioned at gooseneck
+    // In sail local space: mast runs from (0, -gooseneckHeight, 0) up to (0, mastHeight - gooseneckHeight, 0)
+    // The mast center in local space is at approximately x=0, z=0
+    const mastRadius = rigging.mast.baseRadius + 0.005; // small margin
+    const boomRadius = rigging.boom.radius + 0.005;
+
+    if (rigging.sail.collisionEnabled) {
+      pts.forEach((p) => {
+        if (p.fixed) return;
+
+        // Mast collision (vertical cylinder along Y at x≈0, z≈0 in local sail space)
+        // Mast position relative to sail: sail is at gooseneck, mast is at mast.position
+        // In local space, the luff is at x=0 which IS the mast
+        const mastDist2D = Math.sqrt(p.position.x * p.position.x + p.position.z * p.position.z);
+        if (mastDist2D < mastRadius && p.position.y >= -0.1 && p.position.y <= luffLength + 0.5) {
+          // Push outward from mast axis
+          if (mastDist2D > 1e-6) {
+            const scale = mastRadius / mastDist2D;
+            p.position.x *= scale;
+            p.position.z *= scale;
+          } else {
+            p.position.z = mastRadius;
+          }
+        }
+
+        // Boom collision (horizontal cylinder along -X at y≈0 in local sail space)
+        // Boom runs from x=0 to x=-boomLength at y=0
+        if (p.position.x >= -rigging.boom.length && p.position.x <= 0.1) {
+          const boomDist2D = Math.sqrt(p.position.y * p.position.y + p.position.z * p.position.z);
+          if (boomDist2D < boomRadius) {
+            if (boomDist2D > 1e-6) {
+              const scale = boomRadius / boomDist2D;
+              p.position.y *= scale;
+              p.position.z *= scale;
+            } else {
+              p.position.y = boomRadius;
+            }
+          }
+        }
+      });
+    }
+
+    // Self-collision pass
     if (rigging.sail.collisionEnabled) {
       const threshold = rigging.sail.collisionThreshold ?? 0.015;
       const thresholdSq = threshold * threshold;
-      // Simple O(n²) collision for moderate mesh sizes
       for (let a = 0; a < pts.length; a++) {
         if (pts[a].fixed) continue;
         for (let b = a + 2; b < pts.length; b++) {
           if (pts[b].fixed) continue;
-          // Skip adjacent particles (within 2 indices in same row or column)
           const rowA = Math.floor(a / (segW + 1));
           const colA = a % (segW + 1);
           const rowB = Math.floor(b / (segW + 1));
           const colB = b % (segW + 1);
           if (Math.abs(rowA - rowB) <= 1 && Math.abs(colA - colB) <= 1) continue;
-
           const dx = pts[b].position.x - pts[a].position.x;
           const dy = pts[b].position.y - pts[a].position.y;
           const dz = pts[b].position.z - pts[a].position.z;
@@ -546,13 +483,11 @@ export function ClothSail({
 
     // Update geometry
     const posAttr = geometryRef.current.getAttribute('position') as THREE.BufferAttribute;
-    pts.forEach((p, i) => {
-      posAttr.setXYZ(i, p.position.x, p.position.y, p.position.z);
-    });
+    pts.forEach((p, i) => { posAttr.setXYZ(i, p.position.x, p.position.y, p.position.z); });
     posAttr.needsUpdate = true;
     geometryRef.current.computeVertexNormals();
 
-    // Update window patch geometry (if enabled)
+    // Update window patch
     if (windowGeometryRef.current && windowMeshData) {
       const winPos = windowGeometryRef.current.getAttribute('position') as THREE.BufferAttribute;
       windowMeshData.vertexGlobal.forEach((gIdx, i) => {
@@ -563,22 +498,17 @@ export function ClothSail({
       windowGeometryRef.current.computeVertexNormals();
     }
 
-    // Update batten tube meshes from single-row cloth points
+    // Update batten tubes
     if (rigging.sail.battens.enabled && battenPointIndices) {
       battenPointIndices.forEach((rowPts, bi) => {
         const mesh = battenMeshRefs.current[bi];
         if (!mesh || !rowPts || rowPts.length < 2) return;
-
-        // Build a curve from the cloth points in this single row
         const curvePoints: THREE.Vector3[] = [];
         for (let ii = 0; ii < rowPts.length; ii++) {
-          const p = pts[rowPts[ii]];
-          curvePoints.push(p.position.clone().add(new THREE.Vector3(0, 0, 0.003)));
+          curvePoints.push(pts[rowPts[ii]].position.clone().add(new THREE.Vector3(0, 0, 0.003)));
         }
-
         const curve = new THREE.CatmullRomCurve3(curvePoints, false);
         const tubeGeo = new THREE.TubeGeometry(curve, Math.max(4, curvePoints.length * 2), 0.006, 4, false);
-
         mesh.geometry.dispose();
         mesh.geometry = tubeGeo;
       });
@@ -588,65 +518,29 @@ export function ClothSail({
   const gooseneckPosition = rigging.boom.position;
   const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
 
-
   const WindowMesh = () => {
     if (!rigging.sail.window.enabled || !windowGeometry) return null;
-
     return (
       <mesh geometry={windowGeometry}>
-        <meshStandardMaterial
-          color={rigging.sail.window.color}
-          transparent
-          opacity={0.35}
-          roughness={0.05}
-          metalness={0.1}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
+        <meshStandardMaterial color={rigging.sail.window.color} transparent opacity={0.35} roughness={0.05} metalness={0.1} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
     );
   };
 
   return (
-    <group
-      position={[gooseneckPosition.x, gooseneckPosition.y, gooseneckPosition.z]}
-      rotation={[0, boomAngle, 0]}
-    >
+    <group position={[gooseneckPosition.x, gooseneckPosition.y, gooseneckPosition.z]} rotation={[0, boomAngle, 0]}>
       <mesh ref={meshRef} geometry={geometry} onClick={(e) => { e.stopPropagation(); onClick?.(); }}>
-        <meshStandardMaterial
-          color={rigging.sail.color}
-          roughness={0.85}
-          metalness={0}
-          transparent
-          opacity={rigging.sail.opacity}
-          side={THREE.DoubleSide}
-          wireframe={showWireframe}
-          emissive={emissive}
-          emissiveIntensity={highlight ? 0.3 : 0}
-        />
+        <meshStandardMaterial color={rigging.sail.color} roughness={0.85} metalness={0} transparent opacity={rigging.sail.opacity} side={THREE.DoubleSide} wireframe={showWireframe} emissive={emissive} emissiveIntensity={highlight ? 0.3 : 0} />
       </mesh>
 
-
-      {/* Sail window (vinyl) - follows cloth simulation */}
       {rigging.sail.window.enabled && <WindowMesh />}
 
-      {/* Visible batten tubes - each follows a single snapped cloth row */}
       {rigging.sail.battens.enabled && battenPointIndices.map((rowPts, bi) => {
         if (!rowPts || rowPts.length < 2) return null;
         return (
-          <mesh
-            key={`batten-${bi}`}
-            ref={(el) => { if (el) battenMeshRefs.current[bi] = el; }}
-          >
-            <tubeGeometry args={[
-              new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,0), new THREE.Vector3(0.01,0,0)]),
-              2, 0.006, 4, false
-            ]} />
-            <meshStandardMaterial
-              color="#2a2a2a"
-              roughness={0.6}
-              metalness={0.3}
-            />
+          <mesh key={`batten-${bi}`} ref={(el) => { if (el) battenMeshRefs.current[bi] = el; }}>
+            <tubeGeometry args={[new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,0), new THREE.Vector3(0.01,0,0)]), 2, 0.006, 4, false]} />
+            <meshStandardMaterial color="#2a2a2a" roughness={0.6} metalness={0.3} />
           </mesh>
         );
       })}

@@ -68,9 +68,25 @@ export const RIGGING_INFO: Record<string, RiggingComponentInfo> = {
     name: "Mainsheet Boom Block",
     category: "block",
     description:
-      "A double-sheave block (pulley) mounted on the underside of the boom, approximately 1.8 m aft of the gooseneck. The mainsheet runs from the traveler car up through this block and back down, creating a 4:1 purchase system. This is the upper end of the mainsheet tackle.",
-    relationships: ["mainsheet", "boom_block", "mainsheet_traveler"],
+      "A double-sheave block (pulley) mounted on the underside of the boom. The mainsheet runs from the traveler car up through this block, then to the mid-boom block, creating a multi-part purchase system. This is the primary upper block in the mainsheet tackle.",
+    relationships: ["mainsheet", "mainsheet_mid_boom", "mainsheet_traveler", "boom"],
     tips: "Position determines the mainsheet lead angle — moving it aft increases leech tension.",
+  },
+  mainsheet_mid_boom: {
+    name: "Mainsheet Mid-Boom Block",
+    category: "block",
+    description:
+      "A single-sheave turning block on the boom, positioned between the mainsheet boom block and the hull block. The mainsheet passes through this block before descending to the hull-mounted block, adding mechanical advantage to the purchase system.",
+    relationships: ["mainsheet", "mainsheet_boom", "mainsheet_hull", "boom"],
+    tips: "This intermediate block increases the mainsheet purchase ratio for easier trimming.",
+  },
+  mainsheet_hull: {
+    name: "Mainsheet Hull Block",
+    category: "block",
+    description:
+      "A single-sheave block mounted on the hull/cockpit floor. The mainsheet runs from the mid-boom block down through this block and then to the sailor's hand as the free tail. This is the lowest point in the mainsheet purchase system.",
+    relationships: ["mainsheet", "mainsheet_mid_boom", "mainsheet_boom"],
+    tips: "The free tail exits here — this is what the sailor grabs to trim the mainsheet.",
   },
   mainsheet_traveler: {
     name: "Mainsheet Traveler Block",
