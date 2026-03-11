@@ -1,4 +1,4 @@
-// Sail Rig Integration Page — focused on sail system with right detail drawer
+// Sail Rig Integration Page — focused on sail system with right detail drawer (no overlay)
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
@@ -30,7 +30,6 @@ export type ObjectSelection =
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
-// IDs that belong to removed subsystems
 const EXCLUDED_HARDPOINT_IDS = new Set([
   "rudder_pivot", "tiller_attach", "extension_hinge",
   "hiking_strap_bow", "hiking_strap_stern", "centerboard_trunk",
@@ -126,7 +125,7 @@ function getSelectedWorldPos(rigging: LaserRiggingParams, selected: ObjectSelect
   return null;
 }
 
-// ── localStorage persistence ──
+// localStorage persistence
 const STORAGE_KEY = "sailrig-rigging-state";
 
 function serializeRigging(r: LaserRiggingParams): string {
@@ -156,7 +155,7 @@ function loadSavedRigging(): LaserRiggingParams {
   return { ...DEFAULT_LASER_RIGGING };
 }
 
-// ── 3D Scene ──
+// 3D Scene
 function SailRigScene({
   rigging, boomAngle, windAngle, windStrength, showWireframe, showWindArrows, showGrid, showHardpoints,
   selectedObj, onGizmoDrag, onObjectClick, cameraTarget,
@@ -185,13 +184,9 @@ function SailRigScene({
 
       <Suspense fallback={null}>
         <RiggingMesh
-          rigging={rigging}
-          showWireframe={showWireframe}
-          boomAngle={boomRad}
-          windAngle={windAngle}
-          windStrength={windStrength}
-          highlightTarget={highlightTarget(selectedObj, rigging)}
-          onObjectClick={onObjectClick}
+          rigging={rigging} showWireframe={showWireframe} boomAngle={boomRad}
+          windAngle={windAngle} windStrength={windStrength}
+          highlightTarget={highlightTarget(selectedObj, rigging)} onObjectClick={onObjectClick}
         />
         <HardpointMarkers rigging={rigging} boomRad={boomRad} visible={showHardpoints} />
         {showWindArrows && <WindArrow windAngle={windAngle} windStrength={windStrength} />}
@@ -223,7 +218,7 @@ const SailRig = () => {
   const [sections, setSections] = useState({ wind: true, tensions: true, display: false });
   const toggle = (s: keyof typeof sections) => setSections((p) => ({ ...p, [s]: !p[s] }));
 
-  // Persist rigging to localStorage
+  // Persist
   useEffect(() => {
     const timeout = setTimeout(() => {
       localStorage.setItem(STORAGE_KEY, serializeRigging(rigging));
@@ -305,23 +300,22 @@ const SailRig = () => {
     setRigging((r) => ({ ...r, ...patch }));
   }, []);
 
-  // Find related object by ID and select it
   const handleSelectRelated = useCallback((id: string) => {
-    // Check if it's a known top-level
     if (id === "mast") { setSelectedObj({ type: "mast" }); return; }
     if (id === "boom") { setSelectedObj({ type: "boom" }); return; }
     if (id === "sail") { setSelectedObj({ type: "sail" }); return; }
     if (id === "traveler") { setSelectedObj({ type: "traveler" }); return; }
-    // Check pulleys
     const pi = rigging.pulleys.findIndex((p) => p.id === id);
     if (pi >= 0) { setSelectedObj({ type: "pulley", index: pi }); return; }
-    // Check ropes
     const ri = rigging.ropes.findIndex((r) => r.id === id);
     if (ri >= 0) { setSelectedObj({ type: "rope", index: ri }); return; }
-    // Check hardpoints
     const hi = rigging.hardpoints.findIndex((h) => h.id === id);
     if (hi >= 0) { setSelectedObj({ type: "hardpoint", index: hi }); return; }
   }, [rigging]);
+
+  const handleSelectObject = useCallback((sel: ObjectSelection) => {
+    setSelectedObj(sel);
+  }, []);
 
   const worldPos = getSelectedWorldPos(rigging, selectedObj, boomRad);
 
@@ -341,7 +335,7 @@ const SailRig = () => {
             </div>
             <div>
               <h1 className="text-sm font-bold font-mono">Sail Rig Integration</h1>
-              <p className="text-[10px] text-muted-foreground">Click any object in 3D to inspect & edit</p>
+              <p className="text-[10px] text-muted-foreground">Click any object in 3D or use icon bar →</p>
             </div>
           </div>
         </div>
@@ -349,8 +343,8 @@ const SailRig = () => {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left sidebar — Wind, Tensions, Display only */}
-        <div className="w-72 border-r border-border overflow-y-auto scrollbar-hide bg-card p-3 space-y-2 flex-shrink-0">
+        {/* Left sidebar */}
+        <div className="w-64 border-r border-border overflow-y-auto scrollbar-hide bg-card p-3 space-y-2 flex-shrink-0">
           <Collapsible open={sections.display}>
             <CollapsibleTrigger onClick={() => toggle("display")} className="flex items-center justify-between w-full py-1.5 text-xs font-semibold">
               <span className="flex items-center gap-1.5"><Eye className="w-3 h-3" /> Display</span>
@@ -402,20 +396,21 @@ const SailRig = () => {
             />
           </Canvas>
         </div>
-      </div>
 
-      {/* Right Detail Drawer */}
-      <ObjectDetailDrawer
-        selection={selectedObj}
-        rigging={rigging}
-        boomRad={boomRad}
-        onClose={() => setSelectedObj(null)}
-        onSelectRelated={handleSelectRelated}
-        onUpdatePosition={handleDrawerUpdatePosition}
-        worldPosition={worldPos}
-        onUpdateSail={handleUpdateSail}
-        onUpdateRigging={handleUpdateRigging}
-      />
+        {/* Right Detail Drawer — NO overlay */}
+        <ObjectDetailDrawer
+          selection={selectedObj}
+          rigging={rigging}
+          boomRad={boomRad}
+          onClose={() => setSelectedObj(null)}
+          onSelectRelated={handleSelectRelated}
+          onSelectObject={handleSelectObject}
+          onUpdatePosition={handleDrawerUpdatePosition}
+          worldPosition={worldPos}
+          onUpdateSail={handleUpdateSail}
+          onUpdateRigging={handleUpdateRigging}
+        />
+      </div>
     </div>
   );
 };
