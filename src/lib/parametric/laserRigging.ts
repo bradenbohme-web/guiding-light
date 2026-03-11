@@ -207,11 +207,15 @@ export const DEFAULT_LASER_HARDPOINTS: Hardpoint[] = [
 
 // ===== DEFAULT LASER PULLEYS =====
 export const DEFAULT_LASER_PULLEYS: PulleyParams[] = [
-  { id: "mainsheet_boom", position: new THREE.Vector3(-1.8, -0.03, 0.0), attach: "boom", type: "double", radius: 0.02, color: "#1a1a1a" },
+  // Mainsheet system: boom block → mid-boom block → hull block → sailor's hand
+  { id: "mainsheet_boom", position: new THREE.Vector3(-1.85, -0.03, 0.0), attach: "boom", type: "double", radius: 0.02, color: "#1a1a1a" },
+  { id: "mainsheet_mid_boom", position: new THREE.Vector3(-1.2, -0.03, 0.0), attach: "boom", type: "single", radius: 0.018, color: "#1a1a1a" },
+  { id: "mainsheet_hull", position: new THREE.Vector3(-0.5, 0.06, 0.0), attach: "hull", type: "single", radius: 0.018, color: "#1a1a1a" },
   // NOTE: traveler pulley Z gets overridden at runtime from rigging.traveler.carZ
   { id: "mainsheet_traveler", position: new THREE.Vector3(-0.33, 0.09, 0.0), attach: "hull", type: "single", radius: 0.02, color: "#1a1a1a" },
-  { id: "vang_boom_block", position: new THREE.Vector3(-0.5, -0.03, 0.0), attach: "boom", type: "double", radius: 0.015, color: "#1a1a1a" },
-  { id: "vang_base_block", position: new THREE.Vector3(0.04, 0.06, 0.0), attach: "hull", type: "double", radius: 0.015, color: "#1a1a1a" },
+  // Vang: boom block (upper) + mast base block (lower) — proper 6:1 purchase
+  { id: "vang_boom_block", position: new THREE.Vector3(-0.75, -0.03, 0.0), attach: "boom", type: "double", radius: 0.015, color: "#1a1a1a" },
+  { id: "vang_base_block", position: new THREE.Vector3(0.0, 0.15, 0.0), attach: "mast", type: "double", radius: 0.015, color: "#1a1a1a" },
   { id: "cunningham_block", position: new THREE.Vector3(0.08, 0.08, 0.0), attach: "hull", type: "single", radius: 0.012, color: "#1a1a1a" },
   { id: "outhaul_block", position: new THREE.Vector3(-2.4, 0.0, 0.0), attach: "boom", type: "single", radius: 0.012, color: "#1a1a1a" },
 ];
@@ -224,17 +228,19 @@ export const DEFAULT_LASER_ROPES: RopeParams[] = [
     diameter: 0.008,
     color: "#ffffff",
     segments: [
-      { startPoint: "mainsheet_boom", endPoint: "mainsheet_traveler", throughPulleys: ["mainsheet_boom", "mainsheet_traveler"] }
+      // From traveler → boom block → mid-boom block → hull block (purchase system)
+      { startPoint: "mainsheet_traveler", endPoint: "mainsheet_hull", throughPulleys: ["mainsheet_traveler", "mainsheet_boom", "mainsheet_mid_boom", "mainsheet_hull"] }
     ],
     tension: 0.5,
     elasticity: 0.02
   },
   {
     id: "vang",
-    name: "Vang",
+    name: "Boom Vang (Kicking Strap)",
     diameter: 0.006,
     color: "#2563eb",
     segments: [
+      // From boom block down to mast base block — the blue rope that controls boom tension
       { startPoint: "vang_boom_block", endPoint: "vang_base_block", throughPulleys: ["vang_boom_block", "vang_base_block"] }
     ],
     tension: 0.3,
