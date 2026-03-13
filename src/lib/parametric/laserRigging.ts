@@ -167,7 +167,8 @@ export interface LaserRiggingParams {
   traveler: TravelerParams;
 
   // Tuning state
-  vangTension: number;      // Boom angle control: 0..1
+  vangTension: number;      // Boom-vang rope tension: 0..1
+  boomRopeLength: number;   // Effective vang rope length (m)
   cunninghamTension: number;// Luff tension: 0..1
   outhaulTension: number;   // Foot tension: 0..1
   mainsheetTension: number; // Main control: 0..1
