@@ -334,6 +334,8 @@ export function ClothSail({
     const gravity = new THREE.Vector3(0, -(rigging.sail.gravity ?? 0.5), 0);
     const damping = rigging.sail.damping ?? 0.97;
     const iterations = rigging.sail.constraintIterations ?? 5;
+    const boomRopeLength = rigging.boomRopeLength ?? 1.05;
+    const boomRopePull = THREE.MathUtils.clamp((1.5 - boomRopeLength) / 0.9, 0, 1);
 
     // Wind force
     const apparentWindAngle = windAngle - boomAngle;
@@ -351,9 +353,10 @@ export function ClothSail({
       windForce.multiplyScalar(turbulence / p.mass);
       p.acceleration.add(windForce);
 
-      // Vang effect
+      // Vang effect (boom rope tension + boom rope length)
       if (p.u > 0.7) {
-        p.acceleration.add(new THREE.Vector3(0, -rigging.vangTension * 0.5, 0));
+        const vangDownforce = rigging.vangTension * 0.5 + boomRopePull * 0.3;
+        p.acceleration.add(new THREE.Vector3(0, -vangDownforce, 0));
       }
       if (p.battenStiffness > 0) {
         p.acceleration.multiplyScalar(1 / (1 + p.battenStiffness * 0.5));
@@ -529,7 +532,14 @@ export function ClothSail({
 
   return (
     <group position={[gooseneckPosition.x, gooseneckPosition.y, gooseneckPosition.z]} rotation={[0, boomAngle, 0]}>
-      <mesh ref={meshRef} geometry={geometry} onClick={(e) => { e.stopPropagation(); onClick?.(); }}>
+      <mesh
+        ref={meshRef}
+        geometry={geometry}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
+      >
         <meshStandardMaterial color={rigging.sail.color} roughness={0.85} metalness={0} transparent opacity={rigging.sail.opacity} side={THREE.DoubleSide} wireframe={showWireframe} emissive={emissive} emissiveIntensity={highlight ? 0.3 : 0} />
       </mesh>
 
