@@ -372,6 +372,7 @@ export const DEFAULT_LASER_RIGGING: LaserRiggingParams = {
   },
 
   vangTension: 0.4,
+  boomRopeLength: 1.05,
   cunninghamTension: 0.3,
   outhaulTension: 0.5,
   mainsheetTension: 0.5
