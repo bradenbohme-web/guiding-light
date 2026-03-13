@@ -1,5 +1,5 @@
-// Right-side detail panel — NO overlay/dimming. Icon nav bar for all objects. Minimizable.
-import { useCallback, useState } from "react";
+// Right-side detail panel — no overlay/dimming. Icon nav bar for all objects. Minimizable.
+import { useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -13,9 +13,15 @@ import { getRiggingInfo, CATEGORY_LABELS, type RiggingCategory } from "@/lib/par
 import type { LaserRiggingParams } from "@/lib/parametric/laserRigging";
 import type { ObjectSelection } from "@/pages/SailRig";
 import {
-  ChevronRight, ChevronLeft, Minus,
-  // Icons for object types
-  Columns3, Ruler, Wind, Cable, CircleDot, Anchor, Navigation
+  ChevronRight,
+  ChevronLeft,
+  Minus,
+  Columns3,
+  Ruler,
+  Wind,
+  Cable,
+  CircleDot,
+  Navigation,
 } from "lucide-react";
 
 interface ObjectDetailDrawerProps {
@@ -31,15 +37,31 @@ interface ObjectDetailDrawerProps {
   onUpdateRigging: (patch: Partial<LaserRiggingParams>) => void;
 }
 
-function SliderRow({ label, value, min, max, step, unit, onChange }: {
-  label: string; value: number; min: number; max: number; step: number; unit?: string;
+function SliderRow({
+  label,
+  value,
+  min,
+  max,
+  step,
+  unit,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  unit?: string;
   onChange: (v: number) => void;
 }) {
   return (
     <div className="space-y-1">
       <div className="flex justify-between">
         <Label className="text-xs text-muted-foreground">{label}</Label>
-        <span className="text-xs font-mono text-primary">{value.toFixed(step < 0.1 ? 2 : 1)}{unit ?? ""}</span>
+        <span className="text-xs font-mono text-primary">
+          {value.toFixed(step < 0.1 ? 2 : 1)}
+          {unit ?? ""}
+        </span>
       </div>
       <Slider value={[value]} min={min} max={max} step={step} onValueChange={([v]) => onChange(v)} />
     </div>
@@ -47,33 +69,41 @@ function SliderRow({ label, value, min, max, step, unit, onChange }: {
 }
 
 const CATEGORY_BADGE_CLASSES: Record<RiggingCategory, string> = {
-  spar: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-  sail: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-  block: "bg-zinc-500/20 text-zinc-300 border-zinc-500/30",
-  line: "bg-green-500/20 text-green-300 border-green-500/30",
-  fitting: "bg-purple-500/20 text-purple-300 border-purple-500/30",
-  system: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
+  spar: "bg-secondary text-secondary-foreground border-border",
+  sail: "bg-secondary text-secondary-foreground border-border",
+  block: "bg-secondary text-secondary-foreground border-border",
+  line: "bg-secondary text-secondary-foreground border-border",
+  fitting: "bg-secondary text-secondary-foreground border-border",
+  system: "bg-secondary text-secondary-foreground border-border",
 };
 
 function getSelectionId(selection: ObjectSelection, rigging: LaserRiggingParams): string {
   if (!selection) return "";
+
   switch (selection.type) {
-    case "mast": return "mast";
-    case "boom": return "boom";
-    case "sail": return "sail";
-    case "traveler": return "traveler";
-    case "rope": return rigging.ropes[selection.index]?.id ?? "";
-    case "pulley": return rigging.pulleys[selection.index]?.id ?? "";
-    case "hardpoint": return rigging.hardpoints[selection.index]?.id ?? "";
-    default: return "";
+    case "mast":
+      return "mast";
+    case "boom":
+      return "boom";
+    case "sail":
+      return "sail";
+    case "traveler":
+      return "traveler";
+    case "rope":
+      return rigging.ropes[selection.index]?.id ?? "";
+    case "pulley":
+      return rigging.pulleys[selection.index]?.id ?? "";
+    case "hardpoint":
+      return rigging.hardpoints[selection.index]?.id ?? "";
+    default:
+      return "";
   }
 }
 
-// All selectable objects as icon nav items
 interface NavItem {
   id: string;
   label: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   selection: ObjectSelection;
 }
 
@@ -115,13 +145,20 @@ export function ObjectDetailDrawer({
   const info = getRiggingInfo(id);
   const isSail = selection?.type === "sail";
   const navItems = buildNavItems(rigging);
+  const selectedRope = selection?.type === "rope" ? rigging.ropes[selection.index] : null;
 
-  // If nothing selected and not minimized, show the icon nav only
   const showPanel = selection !== null && !minimized;
+
+  const updateRope = (index: number, patch: Partial<LaserRiggingParams["ropes"][number]>) => {
+    onUpdateRigging({
+      ropes: rigging.ropes.map((rope, i) => (i === index ? { ...rope, ...patch } : rope)),
+    });
+  };
+
+  void boomRad;
 
   return (
     <div className="flex flex-shrink-0 h-full">
-      {/* Icon nav bar — always visible */}
       <div className="w-10 border-l border-border bg-card flex flex-col items-center py-2 gap-0.5 overflow-y-auto scrollbar-hide">
         <TooltipProvider delayDuration={200}>
           {navItems.map((item) => {
@@ -139,9 +176,7 @@ export function ObjectDetailDrawer({
                       }
                     }}
                     className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${
-                      isActive
-                        ? "bg-primary/20 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                      isActive ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                     }`}
                   >
                     {item.icon}
@@ -156,10 +191,8 @@ export function ObjectDetailDrawer({
         </TooltipProvider>
       </div>
 
-      {/* Detail panel — slides in, NO overlay */}
       {showPanel && (
         <div className="w-[340px] border-l border-border bg-card flex flex-col overflow-hidden animate-in slide-in-from-right-5 duration-200">
-          {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-border">
             <div className="flex items-center gap-2 min-w-0">
               <Badge variant="outline" className={`text-[10px] shrink-0 ${CATEGORY_BADGE_CLASSES[info.category]}`}>
@@ -177,21 +210,18 @@ export function ObjectDetailDrawer({
             </div>
           </div>
 
-          {/* Content */}
           <ScrollArea className="flex-1">
             <div className="p-3 space-y-3">
-              {/* Description */}
               <p className="text-xs text-muted-foreground leading-relaxed">{info.description}</p>
 
               {info.tips && (
-                <div className="bg-primary/5 border border-primary/20 rounded-md p-2">
-                  <p className="text-[11px] text-primary/80 leading-relaxed">
-                    <span className="font-semibold">💡 Tip:</span> {info.tips}
+                <div className="bg-secondary border border-border rounded-md p-2">
+                  <p className="text-[11px] text-foreground/80 leading-relaxed">
+                    <span className="font-semibold">Tip:</span> {info.tips}
                   </p>
                 </div>
               )}
 
-              {/* Relationships */}
               {info.relationships.length > 0 && (
                 <>
                   <Separator />
@@ -201,8 +231,11 @@ export function ObjectDetailDrawer({
                       {info.relationships.map((relId) => {
                         const relInfo = getRiggingInfo(relId);
                         return (
-                          <button key={relId} onClick={() => onSelectRelated(relId)}
-                            className="text-[10px] px-2 py-0.5 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors cursor-pointer">
+                          <button
+                            key={relId}
+                            onClick={() => onSelectRelated(relId)}
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors cursor-pointer"
+                          >
                             {relInfo.name}
                           </button>
                         );
@@ -212,7 +245,6 @@ export function ObjectDetailDrawer({
                 </>
               )}
 
-              {/* Position */}
               {worldPosition && !isSail && (
                 <>
                   <Separator />
@@ -223,7 +255,6 @@ export function ObjectDetailDrawer({
                 </>
               )}
 
-              {/* Pulley info */}
               {selection?.type === "pulley" && (
                 <div className="text-[11px] text-muted-foreground">
                   <span className="font-semibold">Attach:</span> {rigging.pulleys[selection.index]?.attach} &nbsp;|&nbsp;
@@ -231,7 +262,51 @@ export function ObjectDetailDrawer({
                 </div>
               )}
 
-              {/* ── Sail Controls ── */}
+              {selection?.type === "rope" && selectedRope && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <Label className="text-xs font-semibold uppercase tracking-wide">Line Controls</Label>
+                    <SliderRow
+                      label="Tension"
+                      value={selectedRope.tension}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      onChange={(v) => updateRope(selection.index, { tension: v })}
+                    />
+                    <SliderRow
+                      label="Elasticity"
+                      value={selectedRope.elasticity}
+                      min={0}
+                      max={0.1}
+                      step={0.001}
+                      onChange={(v) => updateRope(selection.index, { elasticity: v })}
+                    />
+                    <SliderRow
+                      label="Diameter"
+                      value={selectedRope.diameter}
+                      min={0.003}
+                      max={0.012}
+                      step={0.0005}
+                      unit=" m"
+                      onChange={(v) => updateRope(selection.index, { diameter: v })}
+                    />
+                    {selectedRope.id === "vang" && (
+                      <SliderRow
+                        label="Boom Rope Length"
+                        value={rigging.boomRopeLength}
+                        min={0.6}
+                        max={1.8}
+                        step={0.01}
+                        unit=" m"
+                        onChange={(v) => onUpdateRigging({ boomRopeLength: v })}
+                      />
+                    )}
+                  </div>
+                </>
+              )}
+
               {isSail && (
                 <>
                   <Separator />
@@ -267,51 +342,15 @@ export function ObjectDetailDrawer({
                       <Label className="text-xs">Enable Collision (Self + Mast + Boom)</Label>
                     </div>
                     {rigging.sail.collisionEnabled && (
-                      <SliderRow label="Collision Threshold" value={rigging.sail.collisionThreshold} min={0.005} max={0.05} step={0.001} unit=" m" onChange={(v) => onUpdateSail({ collisionThreshold: v })} />
-                    )}
-                    <p className="text-[10px] text-muted-foreground leading-relaxed">
-                      When enabled, the sail mesh will not pass through the mast cylinder, boom cylinder, or itself. Increase threshold for stronger repulsion.
-                    </p>
-                  </div>
-
-                  <Separator />
-                  <div className="space-y-3">
-                    <Label className="text-xs font-semibold uppercase tracking-wide">Battens</Label>
-                    <div className="flex items-center gap-2">
-                      <Switch checked={rigging.sail.battens.enabled} onCheckedChange={(v) => onUpdateSail({ battens: { ...rigging.sail.battens, enabled: v } })} className="scale-75" />
-                      <Label className="text-xs">Show Battens</Label>
-                    </div>
-                    {rigging.sail.battens.enabled && rigging.sail.battens.positions.map((pos, bi) => (
-                      <div key={bi} className="space-y-1 pl-2 border-l-2 border-border">
-                        <Label className="text-[10px] text-muted-foreground">Batten {bi + 1}</Label>
-                        <SliderRow label="Position (v)" value={pos} min={0.1} max={0.95} step={0.01}
-                          onChange={(v) => { const newPos = [...rigging.sail.battens.positions]; newPos[bi] = v; onUpdateSail({ battens: { ...rigging.sail.battens, positions: newPos } }); }} />
-                        <SliderRow label="Length" value={rigging.sail.battens.lengths[bi]} min={0.1} max={1.5} step={0.01} unit=" m"
-                          onChange={(v) => { const newLen = [...rigging.sail.battens.lengths]; newLen[bi] = v; onUpdateSail({ battens: { ...rigging.sail.battens, lengths: newLen } }); }} />
-                        <SliderRow label="Stiffness" value={rigging.sail.battens.stiffnesses[bi]} min={0.1} max={1} step={0.01}
-                          onChange={(v) => { const newStiff = [...rigging.sail.battens.stiffnesses]; newStiff[bi] = v; onUpdateSail({ battens: { ...rigging.sail.battens, stiffnesses: newStiff } }); }} />
-                      </div>
-                    ))}
-                  </div>
-
-                  <Separator />
-                  <div className="space-y-3">
-                    <Label className="text-xs font-semibold uppercase tracking-wide">Sail Window</Label>
-                    <div className="flex items-center gap-2">
-                      <Switch checked={rigging.sail.window.enabled} onCheckedChange={(v) => onUpdateSail({ window: { ...rigging.sail.window, enabled: v } })} className="scale-75" />
-                      <Label className="text-xs">Show Window</Label>
-                    </div>
-                    {rigging.sail.window.enabled && (
-                      <>
-                        <SliderRow label="Position U" value={rigging.sail.window.position.u} min={0.1} max={0.9} step={0.01}
-                          onChange={(v) => onUpdateSail({ window: { ...rigging.sail.window, position: { ...rigging.sail.window.position, u: v } } })} />
-                        <SliderRow label="Position V" value={rigging.sail.window.position.v} min={0.1} max={0.9} step={0.01}
-                          onChange={(v) => onUpdateSail({ window: { ...rigging.sail.window, position: { ...rigging.sail.window.position, v: v } } })} />
-                        <SliderRow label="Width" value={rigging.sail.window.size.width} min={0.1} max={1} step={0.01} unit=" m"
-                          onChange={(v) => onUpdateSail({ window: { ...rigging.sail.window, size: { ...rigging.sail.window.size, width: v } } })} />
-                        <SliderRow label="Height" value={rigging.sail.window.size.height} min={0.1} max={1} step={0.01} unit=" m"
-                          onChange={(v) => onUpdateSail({ window: { ...rigging.sail.window, size: { ...rigging.sail.window.size, height: v } } })} />
-                      </>
+                      <SliderRow
+                        label="Collision Threshold"
+                        value={rigging.sail.collisionThreshold}
+                        min={0.005}
+                        max={0.05}
+                        step={0.001}
+                        unit=" m"
+                        onChange={(v) => onUpdateSail({ collisionThreshold: v })}
+                      />
                     )}
                   </div>
                 </>
@@ -321,10 +360,11 @@ export function ObjectDetailDrawer({
         </div>
       )}
 
-      {/* Minimized state — just a small expand button */}
       {minimized && selection && (
-        <button onClick={() => setMinimized(false)}
-          className="w-6 border-l border-border bg-card flex items-center justify-center hover:bg-secondary transition-colors">
+        <button
+          onClick={() => setMinimized(false)}
+          className="w-6 border-l border-border bg-card flex items-center justify-center hover:bg-secondary transition-colors"
+        >
           <ChevronLeft className="w-3 h-3 text-muted-foreground" />
         </button>
       )}
