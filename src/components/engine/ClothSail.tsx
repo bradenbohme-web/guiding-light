@@ -532,7 +532,14 @@ export function ClothSail({
 
   return (
     <group position={[gooseneckPosition.x, gooseneckPosition.y, gooseneckPosition.z]} rotation={[0, boomAngle, 0]}>
-      <mesh ref={meshRef} geometry={geometry} onClick={(e) => { e.stopPropagation(); onClick?.(); }}>
+      <mesh
+        ref={meshRef}
+        geometry={geometry}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
+      >
         <meshStandardMaterial color={rigging.sail.color} roughness={0.85} metalness={0} transparent opacity={rigging.sail.opacity} side={THREE.DoubleSide} wireframe={showWireframe} emissive={emissive} emissiveIntensity={highlight ? 0.3 : 0} />
       </mesh>
 
