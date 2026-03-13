@@ -48,9 +48,9 @@ export const RIGGING_INFO: Record<string, RiggingComponentInfo> = {
     name: "Boom",
     category: "spar",
     description:
-      "The aluminium boom (2.74 m) attaches to the mast at the gooseneck fitting and extends aft. The sail foot is secured along the boom. The outhaul controls the foot tension (sail depth at the bottom), while the vang attaches near the forward end to control leech twist.",
+      "The aluminium boom (2.74 m) attaches to the mast at the gooseneck fitting and extends aft. In this rig model the sail is free-footed: only the clew is tied to boom-end outhaul hardware, while the rest of the foot can float. Vang tension and rope length control how hard the boom is pulled down.",
     relationships: ["gooseneck", "vang_boom", "boom_block", "outhaul_cleat", "boom_end", "sail"],
-    tips: "More outhaul tension flattens the lower sail; ease the outhaul in light air for fuller shape.",
+    tips: "Shorter/tighter boom rope (vang) increases downward boom force; outhaul still controls clew depth.",
   },
 
   // ── Sail ──────────────────────────────────────────
