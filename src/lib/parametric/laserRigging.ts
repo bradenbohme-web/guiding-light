@@ -67,6 +67,9 @@ export interface SailParams {
   gravity: number;             // Gravity multiplier: 0..2
   constraintIterations: number;// Solver iterations: 1..20
   collisionEnabled: boolean;   // Self-collision toggle
+  selfCollisionEnabled: boolean;
+  mastCollisionEnabled: boolean;
+  boomCollisionEnabled: boolean;
   collisionThreshold: number;  // Min particle separation in meters
 }
 
@@ -182,9 +185,10 @@ export const DEFAULT_LASER_HARDPOINTS: Hardpoint[] = [
   { id: "centerboard_trunk", attach: "hull", position: new THREE.Vector3(0.02, -0.01, 0.0), label: "CB Trunk" },
   { id: "vang_base", attach: "hull", position: new THREE.Vector3(0.04, 0.06, 0.0), label: "Vang Base" },
   { id: "cunningham_base", attach: "hull", position: new THREE.Vector3(0.08, 0.08, 0.0), label: "Cunningham" },
-  { id: "traveler_port", attach: "hull", position: new THREE.Vector3(-0.33, 0.09, 0.35), label: "Traveler Port" },
-  { id: "traveler_starboard", attach: "hull", position: new THREE.Vector3(-0.33, 0.09, -0.35), label: "Traveler Stbd" },
-  { id: "mainsheet_base", attach: "hull", position: new THREE.Vector3(-0.33, 0.09, 0.0), label: "Mainsheet" },
+  { id: "traveler_port", attach: "hull", position: new THREE.Vector3(-2.45, 0.09, 0.35), label: "Traveler Port" },
+  { id: "traveler_starboard", attach: "hull", position: new THREE.Vector3(-2.45, 0.09, -0.35), label: "Traveler Stbd" },
+  { id: "mainsheet_base", attach: "hull", position: new THREE.Vector3(-1.7, 0.08, 0.0), label: "Mainsheet Base" },
+  { id: "mainsheet_tail", attach: "hull", position: new THREE.Vector3(-1.45, 0.12, -0.32), label: "Mainsheet Tail" },
   { id: "rudder_pivot", attach: "hull", position: new THREE.Vector3(-2.0, 0.05, 0.0), label: "Rudder Pivot" },
   { id: "hiking_strap_bow", attach: "hull", position: new THREE.Vector3(0.3, 0.05, 0.0), label: "Hiking Fwd" },
   { id: "hiking_strap_stern", attach: "hull", position: new THREE.Vector3(-0.8, 0.05, 0.0), label: "Hiking Aft" },
@@ -192,9 +196,10 @@ export const DEFAULT_LASER_HARDPOINTS: Hardpoint[] = [
   // Boom hardpoints
   { id: "gooseneck", attach: "boom", position: new THREE.Vector3(0.0, 0.0, 0.0), label: "Gooseneck" },
   { id: "vang_boom", attach: "boom", position: new THREE.Vector3(-0.5, -0.03, 0.0), label: "Vang Boom" },
-  { id: "boom_block", attach: "boom", position: new THREE.Vector3(-1.8, -0.03, 0.0), label: "Boom Block" },
-  { id: "outhaul_cleat", attach: "boom", position: new THREE.Vector3(-2.4, 0.0, 0.0), label: "Outhaul" },
-  { id: "boom_end", attach: "boom", position: new THREE.Vector3(-2.55, 0.0, 0.0), label: "Boom End" },
+  { id: "boom_block", attach: "boom", position: new THREE.Vector3(-2.5, -0.03, 0.0), label: "Boom Block" },
+  { id: "outhaul_cleat", attach: "boom", position: new THREE.Vector3(-2.15, 0.05, 0.02), label: "Outhaul Lock" },
+  { id: "boom_end", attach: "boom", position: new THREE.Vector3(-2.74, 0.02, 0.0), label: "Boom End" },
+  { id: "clew_grommet", attach: "boom", position: new THREE.Vector3(-2.67, 0.09, 0.0), label: "Clew Grommet" },
   
   // Mast hardpoints
   { id: "mast_head", attach: "mast", position: new THREE.Vector3(0.0, 6.1, 0.0), label: "Masthead" },
@@ -209,16 +214,16 @@ export const DEFAULT_LASER_HARDPOINTS: Hardpoint[] = [
 // ===== DEFAULT LASER PULLEYS =====
 export const DEFAULT_LASER_PULLEYS: PulleyParams[] = [
   // Mainsheet system: boom block → mid-boom block → hull block → sailor's hand
-  { id: "mainsheet_boom", position: new THREE.Vector3(-1.85, -0.03, 0.0), attach: "boom", type: "double", radius: 0.02, color: "#1a1a1a" },
-  { id: "mainsheet_mid_boom", position: new THREE.Vector3(-1.2, -0.03, 0.0), attach: "boom", type: "single", radius: 0.018, color: "#1a1a1a" },
-  { id: "mainsheet_hull", position: new THREE.Vector3(-0.5, 0.06, 0.0), attach: "hull", type: "single", radius: 0.018, color: "#1a1a1a" },
+  { id: "mainsheet_boom", position: new THREE.Vector3(-2.5, -0.03, 0.0), attach: "boom", type: "double", radius: 0.02, color: "#1a1a1a" },
+  { id: "mainsheet_mid_boom", position: new THREE.Vector3(-2.12, -0.03, 0.0), attach: "boom", type: "single", radius: 0.018, color: "#1a1a1a" },
+  { id: "mainsheet_hull", position: new THREE.Vector3(-1.7, 0.08, 0.0), attach: "hull", type: "single", radius: 0.018, color: "#1a1a1a" },
   // NOTE: traveler pulley Z gets overridden at runtime from rigging.traveler.carZ
-  { id: "mainsheet_traveler", position: new THREE.Vector3(-0.33, 0.09, 0.0), attach: "hull", type: "single", radius: 0.02, color: "#1a1a1a" },
+  { id: "mainsheet_traveler", position: new THREE.Vector3(-2.45, 0.09, 0.0), attach: "hull", type: "single", radius: 0.02, color: "#1a1a1a" },
   // Vang: boom block (upper) + mast base block (lower) — proper 6:1 purchase
-  { id: "vang_boom_block", position: new THREE.Vector3(-0.75, -0.03, 0.0), attach: "boom", type: "double", radius: 0.015, color: "#1a1a1a" },
-  { id: "vang_base_block", position: new THREE.Vector3(0.0, 0.15, 0.0), attach: "mast", type: "double", radius: 0.015, color: "#1a1a1a" },
+  { id: "vang_boom_block", position: new THREE.Vector3(-0.62, -0.03, 0.0), attach: "boom", type: "double", radius: 0.015, color: "#1a1a1a" },
+  { id: "vang_base_block", position: new THREE.Vector3(0.02, 0.16, 0.0), attach: "mast", type: "double", radius: 0.015, color: "#1a1a1a" },
   { id: "cunningham_block", position: new THREE.Vector3(0.08, 0.08, 0.0), attach: "hull", type: "single", radius: 0.012, color: "#1a1a1a" },
-  { id: "outhaul_block", position: new THREE.Vector3(-2.4, 0.0, 0.0), attach: "boom", type: "single", radius: 0.012, color: "#1a1a1a" },
+  { id: "outhaul_block", position: new THREE.Vector3(-2.72, 0.03, 0.0), attach: "boom", type: "single", radius: 0.012, color: "#1a1a1a" },
 ];
 
 // ===== DEFAULT LASER ROPES =====
@@ -230,7 +235,7 @@ export const DEFAULT_LASER_ROPES: RopeParams[] = [
     color: "#ffffff",
     segments: [
       // From traveler → boom block → mid-boom block → hull block (purchase system)
-      { startPoint: "mainsheet_traveler", endPoint: "mainsheet_hull", throughPulleys: ["mainsheet_traveler", "mainsheet_boom", "mainsheet_mid_boom", "mainsheet_hull"] }
+      { startPoint: "mainsheet_traveler", endPoint: "mainsheet_tail", throughPulleys: ["mainsheet_traveler", "mainsheet_boom", "mainsheet_mid_boom", "mainsheet_hull"] }
     ],
     tension: 0.5,
     elasticity: 0.02
@@ -264,7 +269,7 @@ export const DEFAULT_LASER_ROPES: RopeParams[] = [
     diameter: 0.005,
     color: "#16a34a",
     segments: [
-      { startPoint: "boom_end", endPoint: "outhaul_cleat", throughPulleys: ["outhaul_block"] }
+      { startPoint: "clew_grommet", endPoint: "outhaul_cleat", throughPulleys: ["outhaul_block"] }
     ],
     tension: 0.4,
     elasticity: 0.01
@@ -294,7 +299,7 @@ export const DEFAULT_LASER_RIGGING: LaserRiggingParams = {
   sail: {
     luffLength: 5.13,         // Real Laser sail luff: 5.13m (sleeve fits over mast)
     footLength: 2.74,         // Real Laser sail foot: 2.74m (matches boom length)
-    headWidth: 0.10,          // Narrow head per class rules
+    headWidth: 0.01,          // Near-pointed head to avoid a square top silhouette
     footWidth: 1.0,
     leechCurve: 0.04,         // Modest roach per class rules
     cunningham: 0.3,
@@ -319,7 +324,10 @@ export const DEFAULT_LASER_RIGGING: LaserRiggingParams = {
     damping: 0.97,
     gravity: 0.5,
     constraintIterations: 5,
-    collisionEnabled: false,
+    collisionEnabled: true,
+    selfCollisionEnabled: false,
+    mastCollisionEnabled: true,
+    boomCollisionEnabled: true,
     collisionThreshold: 0.015
   },
   centerboard: {
@@ -365,7 +373,7 @@ export const DEFAULT_LASER_RIGGING: LaserRiggingParams = {
   hardpoints: DEFAULT_LASER_HARDPOINTS,
 
   traveler: {
-    x: -0.33,
+    x: -2.45,
     y: 0.09,
     trackHalfSpan: 0.35,
     carZ: 0,
