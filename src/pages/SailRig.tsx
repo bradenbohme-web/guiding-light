@@ -7,8 +7,10 @@ import * as THREE from "three";
 
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING, Hardpoint, PulleyParams } from "@/lib/parametric/laserRigging";
 import { RiggingMesh } from "@/components/engine/RiggingMesh";
+import { BoatSceneShared, SharedHullVersion } from "@/components/engine/BoatSceneShared";
 import { TransformGizmo } from "@/components/engine/TransformGizmo";
 import { ObjectDetailDrawer } from "@/components/engine/ObjectDetailDrawer";
+import { HullV2Params, DEFAULT_HULL_V2_PARAMS } from "@/lib/parametric/v2/types";
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
