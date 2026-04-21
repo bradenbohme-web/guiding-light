@@ -101,6 +101,11 @@ function BoomMesh({ rigging, showWireframe, angle = 0, highlight, onSelect }: { 
         onSelect?.();
       }}
     >
+      {/* Invisible hitbox for easier boom selection */}
+      <mesh position={[-rigging.boom.length / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[rigging.boom.radius * 5, rigging.boom.radius * 5, rigging.boom.length, 8, 1]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
       <mesh geometry={geometry} position={[-rigging.boom.length / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
         <meshStandardMaterial
           color={rigging.boom.color}
