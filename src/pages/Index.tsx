@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const HULL_VERSIONS: { id: HullVersion; label: string; description: string }[] = [
+  { id: "enhanced", label: "Enhanced", description: "High-res V3 + waterline stripe" },
   { id: "parametric", label: "Parametric", description: "Catmull-Rom + Bézier sections" },
   { id: "v3", label: "V3", description: "Monotone cubic + lofted cockpit" },
   { id: "brep", label: "B-Rep", description: "OpenSCAD-derived solid" },
