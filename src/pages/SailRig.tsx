@@ -357,12 +357,19 @@ const SailRig = () => {
   }, []);
 
   const updateMastPos = useCallback((x: number, y: number, z: number) => {
-    setRigging((r) => ({ ...r, mast: { ...r.mast, position: new THREE.Vector3(x, y, z) } }));
+    // Input is the VISUAL CENTER of the mast — convert back to base position
+    setRigging((r) => ({ ...r, mast: { ...r.mast, position: new THREE.Vector3(x, y - r.mast.height / 2, z) } }));
   }, []);
 
   const updateBoomPos = useCallback((x: number, y: number, z: number) => {
-    setRigging((r) => ({ ...r, boom: { ...r.boom, position: new THREE.Vector3(x, y, z) } }));
-  }, []);
+    // Input is the VISUAL CENTER of the boom — convert back to gooseneck position
+    setRigging((r) => {
+      const halfLen = r.boom.length / 2;
+      const gx = x + Math.cos(boomRad) * halfLen;
+      const gz = z - Math.sin(boomRad) * halfLen;
+      return { ...r, boom: { ...r.boom, position: new THREE.Vector3(gx, y, gz) } };
+    });
+  }, [boomRad]);
 
   const updateTravelerPos = useCallback((x: number, y: number, z: number) => {
     setRigging((r) => ({
