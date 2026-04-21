@@ -26,44 +26,61 @@ function computeMastFlex(rigging: LaserRiggingParams, windStrength: number): num
   return baseBend + windLoad + mainsheet + vang + cunningham;
 }
 
-function MastMesh({ rigging, showWireframe, highlight, onSelect }: { rigging: LaserRiggingParams; showWireframe: boolean; highlight: boolean; onSelect?: () => void }) {
+function MastMesh({ rigging, showWireframe, highlight, flexAmount, windAngle, onSelect }: { rigging: LaserRiggingParams; showWireframe: boolean; highlight: boolean; flexAmount: number; windAngle: number; onSelect?: () => void }) {
   const geometry = useMemo(() => {
-    const { height, baseRadius, tipRadius, bend } = rigging.mast;
+    const { height, baseRadius, tipRadius } = rigging.mast;
     const geo = new THREE.CylinderGeometry(tipRadius, baseRadius, height, 32, 24);
     const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
 
+    // Bend the mast in the wind direction (downwind), curve grows toward the tip
+    const bendDirX = -Math.sin(windAngle);
+    const bendDirZ = -Math.cos(windAngle);
+
     for (let i = 0; i < posAttr.count; i++) {
       const y = posAttr.getY(i);
-      const normalizedY = (y + height / 2) / height;
-      const bendOffset = bend * Math.sin(normalizedY * Math.PI) * normalizedY;
-      posAttr.setX(i, posAttr.getX(i) - bendOffset);
+      const normalizedY = (y + height / 2) / height; // 0 at base, 1 at tip
+      // Quadratic bend profile — most flex in the upper portion
+      const bendOffset = flexAmount * normalizedY * normalizedY * height * 0.18;
+      posAttr.setX(i, posAttr.getX(i) + bendDirX * bendOffset);
+      posAttr.setZ(i, posAttr.getZ(i) + bendDirZ * bendOffset);
     }
 
     posAttr.needsUpdate = true;
     geo.computeVertexNormals();
     return geo;
-  }, [rigging.mast]);
+  }, [rigging.mast, flexAmount, windAngle]);
 
   const emissive = highlight ? new THREE.Color("hsl(45, 93%, 58%)") : new THREE.Color(0x000000);
 
+  // Larger invisible hitbox around the mast for easier selection
   return (
-    <mesh
-      geometry={geometry}
-      position={[rigging.mast.position.x, rigging.mast.position.y + rigging.mast.height / 2, rigging.mast.position.z]}
-      onPointerDown={(e) => {
-        e.stopPropagation();
-        onSelect?.();
-      }}
-    >
-      <meshStandardMaterial
-        color={rigging.mast.color}
-        roughness={0.3}
-        metalness={0.7}
-        wireframe={showWireframe}
-        emissive={emissive}
-        emissiveIntensity={highlight ? 0.5 : 0}
-      />
-    </mesh>
+    <group position={[rigging.mast.position.x, rigging.mast.position.y + rigging.mast.height / 2, rigging.mast.position.z]}>
+      <mesh
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onSelect?.();
+        }}
+      >
+        <cylinderGeometry args={[rigging.mast.baseRadius * 4, rigging.mast.baseRadius * 4, rigging.mast.height, 8, 1]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      <mesh
+        geometry={geometry}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onSelect?.();
+        }}
+      >
+        <meshStandardMaterial
+          color={rigging.mast.color}
+          roughness={0.3}
+          metalness={0.7}
+          wireframe={showWireframe}
+          emissive={emissive}
+          emissiveIntensity={highlight ? 0.5 : 0}
+        />
+      </mesh>
+    </group>
   );
 }
 
