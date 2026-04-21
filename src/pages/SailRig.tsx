@@ -275,15 +275,35 @@ function SailRigScene({
       )}
 
       <Suspense fallback={null}>
-        <RiggingMesh
-          rigging={rigging}
-          showWireframe={showWireframe}
-          boomAngle={boomRad}
-          windAngle={windAngle}
-          windStrength={windStrength}
-          highlightTarget={highlightTarget(selectedObj, rigging)}
-          onObjectClick={onObjectClick}
-        />
+        {showHull ? (
+          <BoatSceneShared
+            hullVersion={hullVersion}
+            paramsV2={hullParams}
+            rigging={rigging}
+            resolution="medium"
+            showWireframe={showWireframe}
+            showRigging={true}
+            showOcean={false}
+            boomAngle={boomRad}
+            rudderAngle={0}
+            windAngle={windAngle}
+            windStrength={windStrength}
+            boatSpeed={0}
+            highlightTarget={highlightTarget(selectedObj, rigging)}
+            enableBobbing={false}
+            onObjectClick={onObjectClick}
+          />
+        ) : (
+          <RiggingMesh
+            rigging={rigging}
+            showWireframe={showWireframe}
+            boomAngle={boomRad}
+            windAngle={windAngle}
+            windStrength={windStrength}
+            highlightTarget={highlightTarget(selectedObj, rigging)}
+            onObjectClick={onObjectClick}
+          />
+        )}
 
         <HardpointMarkers rigging={rigging} boomRad={boomRad} visible={showHardpoints} onSelect={onHardpointClick} />
 
