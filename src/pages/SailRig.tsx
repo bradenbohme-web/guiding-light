@@ -214,6 +214,9 @@ function loadSavedRigging(): LaserRiggingParams {
 
 function SailRigScene({
   rigging,
+  hullVersion,
+  hullParams,
+  showHull,
   boomAngle,
   windAngle,
   windStrength,
@@ -228,6 +231,9 @@ function SailRigScene({
   cameraTarget,
 }: {
   rigging: LaserRiggingParams;
+  hullVersion: SharedHullVersion;
+  hullParams: HullV2Params;
+  showHull: boolean;
   boomAngle: number;
   windAngle: number;
   windStrength: number;
