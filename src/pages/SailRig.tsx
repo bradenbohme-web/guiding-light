@@ -136,13 +136,18 @@ function getSelectedWorldPos(rigging: LaserRiggingParams, selected: ObjectSelect
   if (!selected) return null;
 
   if (selected.type === "mast") {
+    // Visual center of the mast (it extends from position.y to position.y + height)
     const p = rigging.mast.position;
-    return [p.x, p.y, p.z];
+    return [p.x, p.y + rigging.mast.height / 2, p.z];
   }
 
   if (selected.type === "boom") {
+    // Visual center of the boom (it extends from gooseneck back along -X by length)
     const p = rigging.boom.position;
-    return [p.x, p.y, p.z];
+    const halfLen = rigging.boom.length / 2;
+    const cx = p.x - Math.cos(boomRad) * halfLen;
+    const cz = p.z + Math.sin(boomRad) * halfLen;
+    return [cx, p.y, cz];
   }
 
   if (selected.type === "traveler") return [rigging.traveler.x, rigging.traveler.y, rigging.traveler.carZ];
