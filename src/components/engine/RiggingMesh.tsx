@@ -185,9 +185,18 @@ export function RiggingMesh({
   highlightTarget = null,
   onObjectClick,
 }: RiggingMeshProps) {
+  const flexAmount = computeMastFlex(rigging, windStrength);
+
   return (
     <group>
-      <MastMesh rigging={rigging} showWireframe={showWireframe} highlight={highlightTarget === "mast"} onSelect={() => onObjectClick?.({ type: "mast" })} />
+      <MastMesh
+        rigging={rigging}
+        showWireframe={showWireframe}
+        highlight={highlightTarget === "mast"}
+        flexAmount={flexAmount}
+        windAngle={windAngle}
+        onSelect={() => onObjectClick?.({ type: "mast" })}
+      />
 
       <BoomMesh rigging={rigging} showWireframe={showWireframe} angle={boomAngle} highlight={highlightTarget === "boom"} onSelect={() => onObjectClick?.({ type: "boom" })} />
 
