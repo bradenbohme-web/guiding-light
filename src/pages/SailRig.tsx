@@ -7,8 +7,10 @@ import * as THREE from "three";
 
 import { LaserRiggingParams, DEFAULT_LASER_RIGGING, Hardpoint, PulleyParams } from "@/lib/parametric/laserRigging";
 import { RiggingMesh } from "@/components/engine/RiggingMesh";
+import { BoatSceneShared, SharedHullVersion } from "@/components/engine/BoatSceneShared";
 import { TransformGizmo } from "@/components/engine/TransformGizmo";
 import { ObjectDetailDrawer } from "@/components/engine/ObjectDetailDrawer";
+import { HullV2Params, DEFAULT_HULL_V2_PARAMS } from "@/lib/parametric/v2/types";
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -212,6 +214,9 @@ function loadSavedRigging(): LaserRiggingParams {
 
 function SailRigScene({
   rigging,
+  hullVersion,
+  hullParams,
+  showHull,
   boomAngle,
   windAngle,
   windStrength,
@@ -226,6 +231,9 @@ function SailRigScene({
   cameraTarget,
 }: {
   rigging: LaserRiggingParams;
+  hullVersion: SharedHullVersion;
+  hullParams: HullV2Params;
+  showHull: boolean;
   boomAngle: number;
   windAngle: number;
   windStrength: number;
@@ -267,15 +275,35 @@ function SailRigScene({
       )}
 
       <Suspense fallback={null}>
-        <RiggingMesh
-          rigging={rigging}
-          showWireframe={showWireframe}
-          boomAngle={boomRad}
-          windAngle={windAngle}
-          windStrength={windStrength}
-          highlightTarget={highlightTarget(selectedObj, rigging)}
-          onObjectClick={onObjectClick}
-        />
+        {showHull ? (
+          <BoatSceneShared
+            hullVersion={hullVersion}
+            paramsV2={hullParams}
+            rigging={rigging}
+            resolution="medium"
+            showWireframe={showWireframe}
+            showRigging={true}
+            showOcean={false}
+            boomAngle={boomRad}
+            rudderAngle={0}
+            windAngle={windAngle}
+            windStrength={windStrength}
+            boatSpeed={0}
+            highlightTarget={highlightTarget(selectedObj, rigging)}
+            enableBobbing={false}
+            onObjectClick={onObjectClick}
+          />
+        ) : (
+          <RiggingMesh
+            rigging={rigging}
+            showWireframe={showWireframe}
+            boomAngle={boomRad}
+            windAngle={windAngle}
+            windStrength={windStrength}
+            highlightTarget={highlightTarget(selectedObj, rigging)}
+            onObjectClick={onObjectClick}
+          />
+        )}
 
         <HardpointMarkers rigging={rigging} boomRad={boomRad} visible={showHardpoints} onSelect={onHardpointClick} />
 
@@ -293,6 +321,17 @@ function SailRigScene({
   );
 }
 
+const HULL_STORAGE_KEY = "sailrig-hull-version";
+const SHOW_HULL_STORAGE_KEY = "sailrig-show-hull";
+
+const HULL_VERSION_OPTIONS: { id: SharedHullVersion; label: string }[] = [
+  { id: "enhanced", label: "Enhanced" },
+  { id: "parametric", label: "Parametric" },
+  { id: "v3", label: "V3" },
+  { id: "brep", label: "B-Rep" },
+  { id: "legacy", label: "Legacy" },
+];
+
 const SailRig = () => {
   const [rigging, setRigging] = useState<LaserRiggingParams>(loadSavedRigging);
   const [windAngle, setWindAngle] = useState(0.3);
@@ -302,6 +341,26 @@ const SailRig = () => {
   const [showGrid, setShowGrid] = useState(true);
   const [showHardpoints, setShowHardpoints] = useState(true);
   const [selectedObj, setSelectedObj] = useState<ObjectSelection>(null);
+
+  const [hullVersion, setHullVersion] = useState<SharedHullVersion>(() => {
+    const saved = (typeof localStorage !== "undefined" && localStorage.getItem(HULL_STORAGE_KEY)) as SharedHullVersion | null;
+    return saved && HULL_VERSION_OPTIONS.some((o) => o.id === saved) ? saved : "enhanced";
+  });
+
+  const [showHull, setShowHull] = useState<boolean>(() => {
+    const saved = typeof localStorage !== "undefined" && localStorage.getItem(SHOW_HULL_STORAGE_KEY);
+    return saved === null ? true : saved === "true";
+  });
+
+  const [hullParams] = useState<HullV2Params>(() => ({ ...DEFAULT_HULL_V2_PARAMS }));
+
+  useEffect(() => {
+    try { localStorage.setItem(HULL_STORAGE_KEY, hullVersion); } catch { /* ignore */ }
+  }, [hullVersion]);
+
+  useEffect(() => {
+    try { localStorage.setItem(SHOW_HULL_STORAGE_KEY, String(showHull)); } catch { /* ignore */ }
+  }, [showHull]);
 
   const boomAngle = useMemo(() => {
     const windSide = windAngle >= 0 ? 1 : -1;
@@ -513,9 +572,34 @@ const SailRig = () => {
           </div>
         </div>
 
-        <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleReset}>
-          Reset All
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-secondary/40 rounded-md p-0.5">
+            {HULL_VERSION_OPTIONS.map((opt) => (
+              <Button
+                key={opt.id}
+                variant={hullVersion === opt.id ? "default" : "ghost"}
+                size="sm"
+                className="h-6 px-2 text-[10px] font-mono"
+                onClick={() => setHullVersion(opt.id)}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-border">
+            <Switch
+              checked={showHull}
+              onCheckedChange={setShowHull}
+              className="scale-75"
+            />
+            <Label className="text-[10px] text-muted-foreground">Hull</Label>
+          </div>
+
+          <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleReset}>
+            Reset All
+          </Button>
+        </div>
       </header>
 
       <div className="flex-1 flex overflow-hidden">
@@ -640,6 +724,9 @@ const SailRig = () => {
           <Canvas shadows gl={{ antialias: true, preserveDrawingBuffer: true }} style={{ background: "hsl(222, 47%, 8%)" }}>
             <SailRigScene
               rigging={rigging}
+              hullVersion={hullVersion}
+              hullParams={hullParams}
+              showHull={showHull}
               boomAngle={boomAngle}
               windAngle={windAngle}
               windStrength={windStrength}
