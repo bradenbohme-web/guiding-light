@@ -321,6 +321,17 @@ function SailRigScene({
   );
 }
 
+const HULL_STORAGE_KEY = "sailrig-hull-version";
+const SHOW_HULL_STORAGE_KEY = "sailrig-show-hull";
+
+const HULL_VERSION_OPTIONS: { id: SharedHullVersion; label: string }[] = [
+  { id: "enhanced", label: "Enhanced" },
+  { id: "parametric", label: "Parametric" },
+  { id: "v3", label: "V3" },
+  { id: "brep", label: "B-Rep" },
+  { id: "legacy", label: "Legacy" },
+];
+
 const SailRig = () => {
   const [rigging, setRigging] = useState<LaserRiggingParams>(loadSavedRigging);
   const [windAngle, setWindAngle] = useState(0.3);
@@ -330,6 +341,26 @@ const SailRig = () => {
   const [showGrid, setShowGrid] = useState(true);
   const [showHardpoints, setShowHardpoints] = useState(true);
   const [selectedObj, setSelectedObj] = useState<ObjectSelection>(null);
+
+  const [hullVersion, setHullVersion] = useState<SharedHullVersion>(() => {
+    const saved = (typeof localStorage !== "undefined" && localStorage.getItem(HULL_STORAGE_KEY)) as SharedHullVersion | null;
+    return saved && HULL_VERSION_OPTIONS.some((o) => o.id === saved) ? saved : "enhanced";
+  });
+
+  const [showHull, setShowHull] = useState<boolean>(() => {
+    const saved = typeof localStorage !== "undefined" && localStorage.getItem(SHOW_HULL_STORAGE_KEY);
+    return saved === null ? true : saved === "true";
+  });
+
+  const [hullParams] = useState<HullV2Params>(() => ({ ...DEFAULT_HULL_V2_PARAMS }));
+
+  useEffect(() => {
+    try { localStorage.setItem(HULL_STORAGE_KEY, hullVersion); } catch { /* ignore */ }
+  }, [hullVersion]);
+
+  useEffect(() => {
+    try { localStorage.setItem(SHOW_HULL_STORAGE_KEY, String(showHull)); } catch { /* ignore */ }
+  }, [showHull]);
 
   const boomAngle = useMemo(() => {
     const windSide = windAngle >= 0 ? 1 : -1;
