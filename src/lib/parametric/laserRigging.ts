@@ -266,7 +266,7 @@ export const DEFAULT_LASER_ROPES: RopeParams[] = [
   {
     id: "outhaul",
     name: "Outhaul",
-    diameter: 0.005,
+    diameter: 0.007,
     color: "#16a34a",
     segments: [
       { startPoint: "clew_grommet", endPoint: "outhaul_cleat", throughPulleys: ["outhaul_block"] }
