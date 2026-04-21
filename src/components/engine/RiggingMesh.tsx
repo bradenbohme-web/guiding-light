@@ -16,6 +16,16 @@ interface RiggingMeshProps {
   onObjectClick?: (target: { type: string; index?: number }) => void;
 }
 
+// Compute dynamic mast bend driven by wind load + rigging tension
+function computeMastFlex(rigging: LaserRiggingParams, windStrength: number): number {
+  const baseBend = rigging.mast.bend;
+  const windLoad = windStrength * 0.18;
+  const mainsheet = rigging.mainsheetTension * 0.08;
+  const vang = rigging.vangTension * 0.12;
+  const cunningham = rigging.cunninghamTension * 0.05;
+  return baseBend + windLoad + mainsheet + vang + cunningham;
+}
+
 function MastMesh({ rigging, showWireframe, highlight, onSelect }: { rigging: LaserRiggingParams; showWireframe: boolean; highlight: boolean; onSelect?: () => void }) {
   const geometry = useMemo(() => {
     const { height, baseRadius, tipRadius, bend } = rigging.mast;
