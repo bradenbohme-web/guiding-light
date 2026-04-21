@@ -154,6 +154,11 @@ function PulleyMesh({ pulley, showWireframe, boomAngle, rigging, highlight, onSe
         onSelect?.();
       }}
     >
+      {/* Invisible hitbox for easier pulley selection */}
+      <mesh>
+        <sphereGeometry args={[0.06, 8, 6]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
       <mesh>
         <boxGeometry args={[0.03, 0.05 * sheaveCount, 0.025]} />
         <meshStandardMaterial
