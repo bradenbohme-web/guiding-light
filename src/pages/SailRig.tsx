@@ -572,9 +572,34 @@ const SailRig = () => {
           </div>
         </div>
 
-        <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleReset}>
-          Reset All
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-secondary/40 rounded-md p-0.5">
+            {HULL_VERSION_OPTIONS.map((opt) => (
+              <Button
+                key={opt.id}
+                variant={hullVersion === opt.id ? "default" : "ghost"}
+                size="sm"
+                className="h-6 px-2 text-[10px] font-mono"
+                onClick={() => setHullVersion(opt.id)}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-border">
+            <Switch
+              checked={showHull}
+              onCheckedChange={setShowHull}
+              className="scale-75"
+            />
+            <Label className="text-[10px] text-muted-foreground">Hull</Label>
+          </div>
+
+          <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleReset}>
+            Reset All
+          </Button>
+        </div>
       </header>
 
       <div className="flex-1 flex overflow-hidden">
@@ -699,6 +724,9 @@ const SailRig = () => {
           <Canvas shadows gl={{ antialias: true, preserveDrawingBuffer: true }} style={{ background: "hsl(222, 47%, 8%)" }}>
             <SailRigScene
               rigging={rigging}
+              hullVersion={hullVersion}
+              hullParams={hullParams}
+              showHull={showHull}
               boomAngle={boomAngle}
               windAngle={windAngle}
               windStrength={windStrength}
